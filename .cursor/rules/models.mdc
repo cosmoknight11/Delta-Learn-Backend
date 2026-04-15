@@ -1,0 +1,39 @@
+---
+description: Django model and migration conventions for Delta Learn
+globs: "**/models.py,**/migrations/**"
+---
+
+# Model Conventions
+
+## Field naming
+- Use snake_case for all model fields
+- ForeignKey fields: name by the related model (e.g., `subject`, `chapter`, `user`)
+- JSON fields: use `JSONField` with `default=list` or `default=dict`, never `null=True`
+
+## Ordering
+- Always define `Meta.ordering` — typically by an explicit `order` field
+- Subjects: `order` (integer, for homepage card order)
+- Chapters: `order` (integer, within a subject)
+- Questions/Takeaways: `order` (integer, within a chapter)
+
+## String representation
+- `__str__` must return something human-readable for Django Admin
+- Chapters: `f"{self.subject.name} — Ch.{self.chapter_number}: {self.title}"`
+- Questions: `f"Q{self.order}: {self.question[:60]}"`
+
+## User-scoped models
+- Always include `user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)`
+- Add `created_at = models.DateTimeField(auto_now_add=True)`
+- Highlights and Notes are user-scoped — never expose across users
+
+## Migrations
+- Run `makemigrations` after every model change
+- Review migration files before committing — watch for unintended alterations
+- Never manually edit migration files unless fixing a conflict
+
+## Admin registration
+- Every model gets registered in `admin.py`
+- Use `list_display` with 3-5 useful columns
+- Use `list_filter` for ForeignKey fields and choice fields
+- Use `search_fields` for text fields the admin might search
+- Use inline admin classes for parent-child relationships (Chapter → Questions)

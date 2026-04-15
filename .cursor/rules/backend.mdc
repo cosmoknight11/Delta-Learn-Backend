@@ -1,0 +1,88 @@
+---
+description: Delta Learn Backend — Django REST API conventions
+globs: "**/*.py"
+alwaysApply: true
+---
+
+# Delta Learn Backend
+
+Django 6 + DRF + SQLite backend for the Delta Learn platform.
+
+## Architecture
+
+```
+Delta-Learn-Backend/
+├── delta_learn/          # Django project (settings, urls, wsgi)
+├── chapters/             # Core app: Subject, Chapter, Question, Takeaway, Highlight, Note
+├── users/                # Auth app: register, login (JWT), /me
+├── fixtures/             # JSON seed data exported from the original React app
+└── manage.py
+```
+
+## Models (chapters app)
+
+| Model     | Key fields                                                                 |
+|-----------|---------------------------------------------------------------------------|
+| Subject   | slug (unique), name, description, accent_color, order                     |
+| Chapter   | subject FK, chapter_number, part, title, subtitle, order                  |
+| Question  | chapter FK, order, question, difficulty, tldr, answer, points (JSON), diagram, diagram2, table_data (JSON), followup |
+| Takeaway  | chapter FK, order, content (HTML)                                         |
+| Highlight | user FK, chapter FK, question_index, text, color (yellow/green/blue/pink) |
+| Note      | user FK, subject FK (nullable), chapter FK (nullable), content, ai_summary |
+
+## API Endpoints
+
+### Public (no auth)
+- `GET /api/subjects/` — list all subjects with chapter_count and written_count
+- `GET /api/subjects/{slug}/` — subject detail with ordered chapter list
+- `GET /api/subjects/{slug}/chapters/{number}/` — full chapter with nested questions + takeaways
+
+### Auth (`/api/auth/`)
+- `POST /api/auth/register/` — create account (username, email, password)
+- `POST /api/auth/login/` — returns JWT access + refresh tokens
+- `POST /api/auth/token/refresh/` — refresh access token
+- `GET /api/auth/me/` — current user profile (requires Bearer token)
+
+### Authenticated (`/api/`)
+- `GET/POST /api/highlights/` — list (filterable by ?subject=&chapter=) / create
+- `DELETE /api/highlights/{id}/` — remove highlight
+- `GET/POST /api/notes/` — list (filterable by ?subject=&chapter=) / create
+- `GET/PATCH/DELETE /api/notes/{id}/` — read/update/delete note
+- `POST /api/notes/{id}/analyze/` — AI analysis placeholder
+
+## Conventions
+
+### Adding a new model
+1. Define in `chapters/models.py` with proper `Meta.ordering` and `__str__`
+2. Register in `chapters/admin.py` with list_display, list_filter, search_fields
+3. Create serializer in `chapters/serializers.py` — use camelCase field aliases for frontend compatibility
+4. Add view in `chapters/views.py` and route in `chapters/urls.py`
+5. Run `python manage.py makemigrations && python manage.py migrate`
+
+### Serializer naming
+- Use camelCase for JSON keys consumed by the frontend (e.g., `accentColor`, `diagramCaption`, `_dbId`)
+- Map to snake_case model fields via `source=` parameter
+
+### Authentication
+- JWT via djangorestframework-simplejwt
+- Access token: 1 hour lifetime; refresh token: 14 days
+- Public endpoints use `permission_classes = [AllowAny]`
+- Authenticated endpoints use `permission_classes = [IsAuthenticated]`
+- User-scoped querysets: always filter by `user=self.request.user`
+
+### Seed data
+- JSON fixtures live in `fixtures/` (system-design.json, dsa.json, ai.json)
+- `python manage.py seed_data` loads them; `--clear` wipes first
+- When adding new chapter content, update the fixture JSON or use Django Admin
+
+### CORS
+- Allowed origins defined in `settings.py`: localhost:5173, delta-learn.netlify.app
+- Add new frontend domains to `CORS_ALLOWED_ORIGINS`
+
+## Subjects
+
+| Subject        | Slug            | Chapters | Accent Color |
+|---------------|-----------------|----------|--------------|
+| System Design | system-design   | 36       | #0a84ff      |
+| DSA Patterns  | dsa             | 39       | #30d158      |
+| AI for Engineers | ai           | 20       | #ff9f0a      |

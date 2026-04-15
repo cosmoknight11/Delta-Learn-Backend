@@ -1,0 +1,38 @@
+---
+description: API endpoint and serializer conventions for Delta Learn Backend
+globs: "**/views.py,**/serializers.py,**/urls.py"
+---
+
+# API Patterns
+
+## View conventions
+
+- Public views: inherit from `generics.ListAPIView` / `RetrieveAPIView`, set `permission_classes = [AllowAny]`
+- Authenticated views: inherit from `generics.ListCreateAPIView` / `RetrieveUpdateDestroyAPIView`, set `permission_classes = [IsAuthenticated]`
+- Always scope user-owned data: `get_queryset` must filter by `user=self.request.user`
+- Use `get_object_or_404` with compound lookups (slug + number) instead of pk for content endpoints
+
+## Serializer conventions
+
+- Use `source=` to map snake_case model fields to camelCase JSON keys
+- Include `_dbId` (mapped from `pk`) when the frontend needs to reference a record
+- Keep serializers flat — avoid deep nesting beyond one level
+- Use `SerializerMethodField` for computed values like `chapter_count`
+
+## URL conventions
+
+- Public content: `/api/subjects/`, `/api/subjects/<slug>/`, `/api/subjects/<slug>/chapters/<int:number>/`
+- Authenticated resources: `/api/highlights/`, `/api/notes/`
+- Auth endpoints: `/api/auth/register/`, `/api/auth/login/`, `/api/auth/token/refresh/`, `/api/auth/me/`
+
+## Filtering
+
+- Use query params for list filtering: `?subject=slug&chapter=number`
+- Parse in `get_queryset`, not in the serializer
+- Return empty list (not 404) when no matches
+
+## Error responses
+
+- Use DRF's built-in error formatting (400 with field-level errors)
+- Custom errors: return `Response({"detail": "message"}, status=XXX)`
+- Never expose internal details (tracebacks, SQL) in error responses
