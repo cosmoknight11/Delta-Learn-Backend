@@ -445,10 +445,14 @@ Now generate the JSON for "{topic.title}".'''
 
             out_path = src_path.replace('.mmd', '.png')
 
+            cmd = ['mmdc', '-i', src_path, '-o', out_path,
+                   '-t', 'dark', '-b', '#141414', '-s', '2']
+            puppeteer_cfg = Path(settings.BASE_DIR) / 'puppeteer-config.json'
+            if puppeteer_cfg.exists():
+                cmd.extend(['-p', str(puppeteer_cfg)])
+
             result = subprocess.run(
-                ['mmdc', '-i', src_path, '-o', out_path,
-                 '-t', 'dark', '-b', '#141414', '-s', '2'],
-                capture_output=True, text=True, timeout=25,
+                cmd, capture_output=True, text=True, timeout=25,
             )
 
             png_file = Path(out_path)

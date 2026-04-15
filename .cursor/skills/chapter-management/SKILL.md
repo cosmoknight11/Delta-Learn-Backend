@@ -67,6 +67,24 @@ The Delta Learn MCP server provides tools for content management with a staged r
 - Follow-ups simulate the interviewer drilling deeper
 - Takeaways are rapid-recall items (3-7 per chapter)
 
+## DeltaMails Management
+
+### Topic Pool
+- `python manage.py seed_topics` — populate EmailTopic from existing Chapters (one-time)
+- `python manage.py refresh_topics` — AI discovers new interview topics via Gemma (weekly cron)
+- `python manage.py refresh_topics --subject system-design --count 30` — targeted refresh
+- `python manage.py refresh_topics --dry-run` — preview without saving
+
+### Sending Emails
+- `python manage.py send_deltamails` — send to all active subscribers (daily cron)
+- `python manage.py send_deltamails --emails user@example.com` — test specific user
+- `python manage.py send_deltamails --dry-run` — preview without sending
+
+### Cron Jobs (django-crontab)
+- `python manage.py crontab show` — list active jobs
+- `python manage.py crontab add` — install cron jobs from settings
+- `python manage.py crontab remove` — uninstall all jobs
+
 ## Question fields reference
 
 | Field            | Type       | Required | Notes                          |

@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.env
+.env.example
+db.sqlite3
+staticfiles/
+.DS_Store
+*.egg-info/
+dist/
+.cursor/
+*.md

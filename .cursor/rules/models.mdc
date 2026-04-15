@@ -23,6 +23,8 @@ globs: "**/models.py,**/migrations/**"
 | Note           | User      | User note (subject/chapter)      | Belongs to user, optional subject/chapter |
 | StagedRequest  | User      | Proposed content change          | requested_by + reviewed_by users   |
 | Subscription   | Subject   | DeltaMails email subscription    | Belongs to subject, optional user  |
+| EmailTopic     | Subject   | Interview topic for DeltaMails    | Belongs to subject, optional chapter link |
+| SentHistory    | Subscription | Tracks sent topics per subscriber | Belongs to subscription + topic       |
 
 ## Ordering
 - Always define `Meta.ordering`

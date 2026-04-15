@@ -30,6 +30,8 @@ Delta-Learn-Backend/
 | Highlight      | user FK, chapter FK, question_index, text, color (yellow/green/blue/pink) |
 | Note           | user FK, subject FK (nullable), chapter FK (nullable), content, ai_summary |
 | StagedRequest  | operation (create/update/delete), target_model, target_id, payload (JSON), status (pending/approved/rejected), requested_by FK, reviewed_by FK, review_note, created_at, reviewed_at |
+| EmailTopic     | subject FK, title, keywords (JSON), source (chapter/web/manual), chapter FK (nullable), is_active, created_at |
+| SentHistory    | subscription FK, topic FK, sent_at, questions_json (JSON — stores AI content for past emails) |
 
 ## API Endpoints
 
@@ -110,13 +112,14 @@ Delta-Learn-Backend/
 - Add new frontend domains to `CORS_ALLOWED_ORIGINS` in settings.py
 
 ### DeltaMails
-- Subscription model: email + subject + difficulty + custom_prompt
-- API endpoints under `/api/deltamails/`
-- Management command: `python manage.py send_deltamails` (daily via PythonAnywhere at 9 AM UTC)
-- Uses Gemma 3 27B (google-genai) for personalized Q&A generation
-- Gmail SMTP from `admin.deltalearn@gmail.com`
-- Credentials stored in `.env` (GEMINI_API_KEY, GMAIL_APP_PASSWORD)
-- Admin action: "Send test DeltaMail" on selected Subscription objects
+- Topic pool: `EmailTopic` model seeded from chapters + AI-discovered via `refresh_topics`
+- Dedup: `SentHistory` tracks every topic sent per subscription — no repeats until cycle reset
+- Management commands:
+  - `send_deltamails` — daily at 7 AM IST (django-crontab), picks topic, calls Gemma, sends email
+  - `refresh_topics` — weekly on Mondays at 3 AM IST, AI generates ~20 new topics per subject
+  - `seed_topics` — one-time seed from existing chapters
+- Email: Apple-inspired full-bleed template, CID-attached PNG diagrams (via mmdc), per-subject accent
+- Credentials in `.env`: GEMINI_API_KEY, GMAIL_APP_PASSWORD
 
 ## Subjects
 

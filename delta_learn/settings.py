@@ -24,17 +24,16 @@ load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-wl&4&4nzy0pcvr7g9f^cm)1mi&4ysig#w*f9c6+cr5tys@gwpo'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-wl&4&4nzy0pcvr7g9f^cm)1mi&4ysig#w*f9c6+cr5tys@gwpo',
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    '.pythonanywhere.com',
-]
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS', 'localhost,127.0.0.1,.pythonanywhere.com'
+).split(',')
 
 
 # Application definition
@@ -65,11 +64,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'https://delta-learn.netlify.app',
-]
+_default_cors = 'http://localhost:5173,http://127.0.0.1:5173,https://delta-learn.netlify.app'
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', _default_cors).split(',')
 
 ROOT_URLCONF = 'delta_learn.urls'
 
@@ -97,7 +93,7 @@ WSGI_APPLICATION = 'delta_learn.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.environ.get('DB_PATH', str(BASE_DIR / 'db.sqlite3')),
     }
 }
 
