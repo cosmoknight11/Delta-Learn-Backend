@@ -20,7 +20,6 @@ urlpatterns = [
     path('manage/questions/<int:pk>/', views.AdminQuestionDetailView.as_view(), name='admin-question-detail'),
     path('manage/takeaways/', views.AdminTakeawayListCreateView.as_view(), name='admin-takeaway-list'),
     path('manage/takeaways/<int:pk>/', views.AdminTakeawayDetailView.as_view(), name='admin-takeaway-detail'),
-    path('manage/chapters/<int:pk>/populate/', views.AdminChapterPopulateView.as_view(), name='admin-chapter-populate'),
     path('manage/chapters/<int:pk>/stage-populate/', views.AdminChapterStagePopulateView.as_view(), name='admin-chapter-stage-populate'),
 
     # ── Staged requests (authenticated, admin approves) ──

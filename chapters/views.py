@@ -204,62 +204,6 @@ class AdminTakeawayDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 @extend_schema(tags=['Admin — Chapters'])
-class AdminChapterPopulateView(APIView):
-    """Bulk-populate a chapter with questions and takeaways in one request.
-
-    Replaces all existing questions/takeaways. Admin only, no staging.
-    """
-    permission_classes = [permissions.IsAdminUser]
-
-    @transaction.atomic
-    def post(self, request, pk):
-        chapter = get_object_or_404(
-            Chapter.objects.select_related('subject'), pk=pk
-        )
-        questions_data = request.data.get('questions', [])
-        takeaways_data = request.data.get('takeaways', [])
-
-        if not questions_data:
-            return Response(
-                {'detail': 'At least one question is required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        chapter.questions.all().delete()
-        chapter.takeaways.all().delete()
-
-        for idx, q in enumerate(questions_data, start=1):
-            Question.objects.create(
-                chapter=chapter,
-                order=q.get('order', idx),
-                question=q['question'],
-                difficulty=q.get('difficulty', 'medium'),
-                tldr=q.get('tldr', ''),
-                answer=q.get('answer', ''),
-                points=q.get('points', []),
-                diagram=q.get('diagram', ''),
-                diagram_caption=q.get('diagram_caption', ''),
-                diagram2=q.get('diagram2', ''),
-                diagram2_caption=q.get('diagram2_caption', ''),
-                table_data=q.get('table_data'),
-                followup=q.get('followup', ''),
-            )
-
-        for idx, t in enumerate(takeaways_data, start=1):
-            Takeaway.objects.create(
-                chapter=chapter,
-                order=t.get('order', idx),
-                content=t['content'],
-            )
-
-        chapter.refresh_from_db()
-        serializer = ChapterDetailSerializer(
-            Chapter.objects.prefetch_related('questions', 'takeaways').get(pk=pk)
-        )
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-@extend_schema(tags=['Admin — Chapters'])
 class AdminChapterStagePopulateView(APIView):
     """Stage a full chapter populate as a single reviewable request.
 

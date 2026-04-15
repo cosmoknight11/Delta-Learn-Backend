@@ -42,17 +42,19 @@ globs: "**/views.py,**/serializers.py,**/urls.py"
 ```json
 {
   "operation": "create | update | delete",
-  "target_model": "subject | chapter | question | takeaway",
+  "target_model": "subject | chapter | question | takeaway | chapter_populate",
   "target_id": null,
   "payload": { "field": "value" }
 }
 ```
 
-- `target_id` is null for create, required for update/delete
+- `target_id` is null for create (set after apply), required for update/delete/chapter_populate
 - `payload` contains model fields as key-value pairs
 - For create: payload has all required fields (e.g., `chapter_id`, `question`, `answer`)
 - For update: payload has only the fields to change
 - For delete: payload is empty `{}`
+- For `chapter_populate`: payload has `{chapter_title, questions: [...], takeaways: [...]}`
+- Bulk stage endpoint: `POST /api/manage/chapters/{id}/stage-populate/` (IsAuthenticated)
 
 ## Filtering
 

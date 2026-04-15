@@ -5,61 +5,40 @@ globs: "**/models.py,**/migrations/**"
 
 # Model Conventions
 
-## Field naming
-- Use snake_case for all model fields
-- ForeignKey fields: name by the related model (e.g., `subject`, `chapter`, `user`)
-- JSON fields: use `JSONField` with `default=list` or `default=dict`, never `null=True`
-- Timestamps: `auto_now_add=True` for creation, `auto_now=True` for updates
+## Model Inventory (10 models)
 
-## Model inventory
+| Model | Parent | Key Fields | Ordering |
+|-------|--------|-----------|----------|
+| Subject | — | slug (unique), name, description, accent_color, order | order |
+| Chapter | Subject FK | chapter_number, part, title, subtitle, order | order, chapter_number |
+| Question | Chapter FK | order, question, difficulty, tldr, answer, points (JSON), diagram, diagram2, table_data (JSON), followup | order |
+| Takeaway | Chapter FK | order, content | order |
+| Highlight | User FK + Chapter FK | question_index, text, color, created_at | -created_at |
+| Note | User FK | subject FK?, chapter FK?, content, ai_summary | -updated_at |
+| StagedRequest | User FK | operation, target_model, target_id?, payload (JSON), status, review_note | -created_at |
+| Subscription | Subject FK | email, user FK?, difficulty, custom_prompt, is_active, last_sent_at | -created_at |
+| EmailTopic | Subject FK | title, keywords (JSON), source, chapter FK?, is_active | subject, title |
+| SentHistory | Subscription FK + Topic FK | sent_at, questions_json (JSON) | -sent_at |
 
-| Model          | Parent     | Purpose                          | Key relationships                  |
-|----------------|-----------|----------------------------------|------------------------------------|
-| Subject        | —         | Top-level content category       | Has many chapters                  |
-| Chapter        | Subject   | One chapter within a subject     | Has many questions + takeaways     |
-| Question       | Chapter   | Interview question with answer   | Belongs to chapter                 |
-| Takeaway       | Chapter   | Quick-recall summary item        | Belongs to chapter                 |
-| Highlight      | User      | Text highlight in a chapter      | Belongs to user + chapter          |
-| Note           | User      | User note (subject/chapter)      | Belongs to user, optional subject/chapter |
-| StagedRequest  | User      | Proposed content change          | requested_by + reviewed_by users   |
-| Subscription   | Subject   | DeltaMails email subscription    | Belongs to subject, optional user  |
-| EmailTopic     | Subject   | Interview topic for DeltaMails    | Belongs to subject, optional chapter link |
-| SentHistory    | Subscription | Tracks sent topics per subscriber | Belongs to subscription + topic       |
+## StagedRequest
 
-## Ordering
-- Always define `Meta.ordering`
-- Subjects/Chapters/Questions/Takeaways: `order` field (PositiveIntegerField)
-- User data (highlights, notes, staged requests): `-created_at` (newest first)
+- `operation`: create | update | delete
+- `target_model`: subject | chapter | question | takeaway | chapter_populate
+- `chapter_populate`: payload = `{chapter_title, questions: [...], takeaways: [...]}`
+- `apply(reviewer)`: for standard models, creates/updates/deletes directly; for `chapter_populate`, calls `_apply_chapter_populate()` which atomically replaces all questions + takeaways
+- `reject(reviewer, note)`: sets status=rejected
 
-## String representation
-- `__str__` must return something human-readable for Django Admin
-- Chapters: `f"{self.subject.slug} Ch.{self.chapter_number}: {self.title}"`
-- Questions: `f"Q{self.order}: {self.question[:80]}"`
-- StagedRequests: `f"[{self.status}] {self.operation} {self.target_model} by {self.requested_by}"`
+## Rules
 
-## StagedRequest model
-- `operation`: create / update / delete
-- `target_model`: subject / chapter / question / takeaway
-- `target_id`: null for create (set after apply), required for update/delete
-- `payload`: JSONField storing the model fields to create/update
-- `status`: pending → approved (via `apply()`) or rejected (via `reject()`)
-- `apply(reviewer)`: executes the operation, sets status to approved
-- `reject(reviewer, note)`: sets status to rejected with optional note
-
-## User-scoped models
-- Always include `user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)`
-- Highlights and Notes are user-scoped — never expose across users
-- StagedRequest: users see own requests, admins see all
-
-## Migrations
+- snake_case fields; ForeignKey named by related model
+- JSONField: `default=list` or `default=dict`, not `null=True`
+- Every model: `Meta.ordering`, meaningful `__str__`
+- User-scoped models always filter by `user=request.user` in views
 - Run `makemigrations` after every model change
-- Review migration files before committing
-- Never manually edit migration files unless fixing a conflict
 
-## Admin registration
-- Every model gets registered in `admin.py`
-- Use `list_display` with 3-5 useful columns
-- Use `list_filter` for ForeignKey fields and choice fields
-- Use inline admin classes for parent-child relationships (Chapter → Questions)
-- StagedRequest admin: color-coded status badges, JSON payload preview, bulk approve/reject actions
-- Subscription admin: list with email, subject, difficulty, is_active; "Send test DeltaMail" action
+## Admin
+
+- Every model registered in `admin.py` (except EmailTopic, SentHistory)
+- StagedRequest admin: styled HTML preview, default pending filter, bulk approve/reject
+- Subscription admin: send test DeltaMail action
+- Chapter admin: inline Questions + Takeaways, preview link
