@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 from .models import Subject, Chapter, Question, Takeaway, Highlight, Note, StagedRequest, Subscription
 
@@ -299,7 +300,7 @@ class StagedRequestAdmin(admin.ModelAdmin):
                 )
 
             html += '</div>'
-            return format_html(html)
+            return mark_safe(html)
 
         elif model == 'takeaway':
             content = p.get('content', '')
@@ -311,7 +312,7 @@ class StagedRequestAdmin(admin.ModelAdmin):
                 f'<div style="font-size:1rem;">{content}</div>'
                 f'</div>'
             )
-            return format_html(html)
+            return mark_safe(html)
 
         elif model == 'chapter':
             html = f'<div style="{css}">'
@@ -321,7 +322,7 @@ class StagedRequestAdmin(admin.ModelAdmin):
             if sub:
                 html += f'<div style="color:#aaa;font-style:italic;">{sub}</div>'
             html += '</div>'
-            return format_html(html)
+            return mark_safe(html)
 
         elif model == 'subject':
             html = f'<div style="{css}">'
@@ -330,7 +331,7 @@ class StagedRequestAdmin(admin.ModelAdmin):
             color = p.get('accent_color', '#888')
             html += f'<div style="margin-top:8px;"><span style="display:inline-block;width:20px;height:20px;background:{color};border-radius:4px;vertical-align:middle;"></span> <span style="color:#86868b;">{color}</span></div>'
             html += '</div>'
-            return format_html(html)
+            return mark_safe(html)
 
         return format_html(
             '<pre style="background:#1c1c1e;color:#f5f5f7;padding:12px;border-radius:8px;">{}</pre>',
