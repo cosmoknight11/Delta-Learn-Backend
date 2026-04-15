@@ -5,13 +5,18 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from email.mime.image import MIMEImage
+
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.utils.html import escape as html_escape
 
-from chapters.models import Subscription, Chapter, Question, Highlight, Note
+from chapters.models import (
+    Subscription, Chapter, Question, Highlight, Note,
+    EmailTopic, SentHistory,
+)
 
 
 # Mirrors the exact JSON shape from QuestionReadSerializer + real fixture data.
@@ -75,7 +80,7 @@ class Command(BaseCommand):
         dry_run = options.get('dry_run', False)
 
         qs = Subscription.objects.filter(is_active=True).select_related(
-            'subject', 'last_chapter_sent', 'user',
+            'subject', 'user',
         )
         if filter_emails:
             qs = qs.filter(email__in=filter_emails)
@@ -91,15 +96,13 @@ class Command(BaseCommand):
         sent_count = 0
         for email, subs in grouped.items():
             for sub in subs:
-                chapter = self._pick_chapter(sub)
-                if not chapter:
-                    self.stdout.write(f'  No chapters for {sub.subject.slug}, skipping.')
+                topic = self._pick_topic(sub)
+                if not topic:
+                    self.stdout.write(f'  No topics for {sub.subject.slug}, skipping.')
                     continue
 
-                body_html = self._generate_email(sub, chapter)
-                subject_line = (
-                    f'DeltaMail: {chapter.title} — {sub.subject.name}'
-                )
+                body_html, inline_images, ai_data = self._generate_email(sub, topic)
+                subject_line = f'DeltaMail: {topic.title} — {sub.subject.name}'
 
                 if dry_run:
                     self.stdout.write(f'\n--- DRY RUN: {email} ({sub.subject.slug}) ---')
@@ -107,20 +110,34 @@ class Command(BaseCommand):
                     self.stdout.write(body_html[:500] + '...')
                 else:
                     try:
-                        send_mail(
+                        msg = EmailMessage(
                             subject=subject_line,
-                            message='',
-                            html_message=body_html,
+                            body=body_html,
                             from_email=settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=[email],
-                            fail_silently=False,
+                            to=[email],
                         )
+                        msg.content_subtype = 'html'
+                        for cid, png_bytes in inline_images:
+                            mime_img = MIMEImage(png_bytes, _subtype='png')
+                            mime_img.add_header('Content-ID', f'<{cid}>')
+                            mime_img.add_header(
+                                'Content-Disposition', 'inline',
+                                filename=f'{cid}.png',
+                            )
+                            msg.attach(mime_img)
+                        msg.send(fail_silently=False)
+
                         sub.last_sent_at = timezone.now()
-                        sub.last_chapter_sent = chapter
-                        sub.save(update_fields=['last_sent_at', 'last_chapter_sent'])
+                        sub.save(update_fields=['last_sent_at'])
+
+                        SentHistory.objects.update_or_create(
+                            subscription=sub, topic=topic,
+                            defaults={'questions_json': ai_data},
+                        )
+
                         sent_count += 1
                         self.stdout.write(
-                            self.style.SUCCESS(f'  Sent to {email}: {chapter.title}')
+                            self.style.SUCCESS(f'  Sent to {email}: {topic.title}')
                         )
                     except Exception as exc:
                         self.stderr.write(
@@ -129,100 +146,109 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f'\nDone. {sent_count} email(s) sent.'))
 
-    # ── chapter selection (focus-scored) ───────────────
+    # ── topic selection (dedup-aware, focus-scored) ────
 
-    def _pick_chapter(self, sub):
-        chapters = list(
-            Chapter.objects.filter(subject=sub.subject).order_by('chapter_number')
+    def _pick_topic(self, sub):
+        all_topics = list(
+            EmailTopic.objects.filter(
+                subject=sub.subject, is_active=True,
+            ).select_related('chapter')
         )
-        if not chapters:
+        if not all_topics:
             return None
 
-        sent_ids = set()
-        if sub.last_chapter_sent:
-            sent_ids.add(sub.last_chapter_sent.pk)
+        sent_ids = set(
+            SentHistory.objects.filter(subscription=sub)
+            .values_list('topic_id', flat=True)
+        )
 
-        unsent = [c for c in chapters if c.pk not in sent_ids]
-        pool = unsent if unsent else chapters
+        unsent = [t for t in all_topics if t.pk not in sent_ids]
+        if not unsent:
+            self.stdout.write(
+                f'  All {len(all_topics)} topics sent for {sub.email}; '
+                f'starting new cycle.'
+            )
+            SentHistory.objects.filter(subscription=sub).delete()
+            unsent = all_topics
 
         if sub.custom_prompt and sub.custom_prompt.strip():
-            stop_words = {
-                'the', 'and', 'for', 'with', 'that', 'this', 'from', 'are',
-                'was', 'were', 'been', 'have', 'has', 'had', 'will', 'would',
-                'could', 'should', 'may', 'might', 'can', 'how', 'what',
-                'when', 'where', 'why', 'who', 'which', 'about', 'into',
-                'like', 'more', 'also', 'use', 'using', 'used', 'focus',
-                'explain', 'cover', 'include', 'want', 'need', 'make',
-            }
-            focus = sub.custom_prompt.lower()
-            focus_words = [
-                w for w in re.split(r'[\s,;/\-]+', focus)
-                if len(w) >= 3 and w not in stop_words
-            ]
-            scored = []
-            for ch in pool:
-                haystack_title = ch.title.lower()
-                haystack_sub = (ch.subtitle or '').lower()
-                haystack_part = (ch.part or '').lower()
-                score = 0
-                for word in focus_words:
-                    if word in haystack_title:
-                        score += 5
-                    elif len(word) >= 4 and word[:4] in haystack_title:
-                        score += 3
-                    if word in haystack_sub:
-                        score += 3
-                    elif len(word) >= 4 and word[:4] in haystack_sub:
-                        score += 1
-                    if word in haystack_part:
-                        score += 1
-                scored.append((score, ch))
+            return self._score_topics(unsent, sub.custom_prompt)
 
-            scored.sort(key=lambda x: x[0], reverse=True)
-            if scored[0][0] > 0:
-                best_score = scored[0][0]
-                top = [ch for s, ch in scored if s == best_score]
-                return random.choice(top)
+        return random.choice(unsent)
 
-        if unsent:
-            return unsent[0]
-        return random.choice(chapters)
+    @staticmethod
+    def _score_topics(pool, custom_prompt):
+        stop_words = {
+            'the', 'and', 'for', 'with', 'that', 'this', 'from', 'are',
+            'was', 'were', 'been', 'have', 'has', 'had', 'will', 'would',
+            'could', 'should', 'may', 'might', 'can', 'how', 'what',
+            'when', 'where', 'why', 'who', 'which', 'about', 'into',
+            'like', 'more', 'also', 'use', 'using', 'used', 'focus',
+            'explain', 'cover', 'include', 'want', 'need', 'make',
+        }
+        focus = custom_prompt.lower()
+        focus_words = [
+            w for w in re.split(r'[\s,;/\-]+', focus)
+            if len(w) >= 3 and w not in stop_words
+        ]
+        if not focus_words:
+            return random.choice(pool)
+
+        scored = []
+        for topic in pool:
+            title_lower = topic.title.lower()
+            kw_str = ' '.join(topic.keywords).lower()
+            score = 0
+            for word in focus_words:
+                if word in title_lower:
+                    score += 5
+                if word in kw_str:
+                    score += 3
+                if len(word) >= 4 and word[:4] in title_lower:
+                    score += 1
+            scored.append((score, topic))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        best = scored[0][0]
+        if best > 0:
+            top = [t for s, t in scored if s == best]
+            return random.choice(top)
+        return random.choice(pool)
 
     # ── email generation ──────────────────────────────
 
-    def _generate_email(self, sub, chapter):
+    def _generate_email(self, sub, topic):
         accent = sub.subject.accent_color or '#0a84ff'
 
-        questions = list(
-            Question.objects.filter(chapter=chapter).order_by('order')
-        )
+        ref_questions = []
+        if topic.chapter:
+            ref_questions = list(
+                Question.objects.filter(chapter=topic.chapter).order_by('order')[:6]
+            )
 
         user_context = ''
         if sub.user:
-            highlights = list(
-                Highlight.objects.filter(
-                    user=sub.user, chapter=chapter,
-                ).values_list('text', flat=True)[:10]
-            )
             notes = list(
                 Note.objects.filter(
                     user=sub.user, subject=sub.subject,
                 ).values_list('content', flat=True)[:5]
             )
-            if highlights:
-                user_context += f'\nUser highlights: {"; ".join(highlights[:5])}'
             if notes:
                 user_context += f'\nUser notes: {"; ".join(notes[:3])}'
 
-        prompt = self._build_prompt(sub, chapter, questions, accent, user_context)
+        prompt = self._build_prompt(sub, topic, ref_questions, user_context)
         raw = self._call_gemma(prompt)
         data = self._parse_ai_response(raw)
 
-        return self._render_html(sub, chapter, accent, data)
+        self._inline_images = []
+        html = self._render_html(sub, topic, accent, data)
+        images = self._inline_images
+        self._inline_images = []
+        return html, images, data
 
     # ── AI prompt (philosophy + frontend schema) ──────
 
-    def _build_prompt(self, sub, chapter, questions, accent, user_context):
+    def _build_prompt(self, sub, topic, ref_questions, user_context):
         difficulty_guide = {
             'easy': 'Use simple language, analogies, beginner-friendly explanations. Avoid jargon.',
             'medium': 'Assume working knowledge of software engineering fundamentals.',
@@ -230,13 +256,20 @@ class Command(BaseCommand):
             'mixed': 'Start simple, then escalate to advanced trade-offs.',
         }
 
-        q_text = '\n'.join(
-            f'Q{i+1}: {q.question}\n   TLDR: {q.tldr}'
-            f'\n   Answer excerpt: {q.answer[:150]}...' if q.answer else ''
-            f'\n   Diagram: {"Yes (Mermaid)" if q.diagram else "None"}'
-            f'\n   Table: {"Yes" if q.table_data else "None"}'
-            for i, q in enumerate(questions[:6])
-        )
+        ref_block = ''
+        if ref_questions:
+            lines = []
+            for i, q in enumerate(ref_questions):
+                lines.append(
+                    f'Q{i+1}: {q.question}\n   TLDR: {q.tldr}'
+                    + (f'\n   Answer excerpt: {q.answer[:150]}...' if q.answer else '')
+                )
+            ref_block = (
+                '\nReference questions (use as INSPIRATION only — generate NEW ones):\n'
+                + '\n'.join(lines)
+            )
+
+        keywords_str = ', '.join(topic.keywords) if topic.keywords else ''
 
         custom_block = ''
         if sub.custom_prompt and sub.custom_prompt.strip():
@@ -246,7 +279,7 @@ The user specifically asked to focus on: "{sub.custom_prompt}"
 This MUST shape your output:
   - Angle every question toward this focus area.
   - If the focus is a sub-topic (e.g. "caching", "load balancing"), frame all
-    questions around how that sub-topic relates to the chapter topic.
+    questions around how that sub-topic relates to the email topic.
   - If the focus is a style preference (e.g. "explain like I am 5", "use
     analogies"), adapt your language and explanations accordingly.
   - The intro, tip, and closing should all reference this focus.
@@ -254,13 +287,12 @@ This MUST shape your output:
 
         return f'''You are DeltaMails — a daily interview-prep email for "{sub.subject.name}".
 
-Topic: "{chapter.title}" (Chapter {chapter.chapter_number})
+Topic: "{topic.title}"
+Key concepts: {keywords_str}
 Difficulty: {sub.difficulty} — {difficulty_guide.get(sub.difficulty, "")}
 {custom_block}
-{f"Personalization context (user highlights & notes): {user_context}" if user_context else ""}
-
-Reference questions from this chapter (use as inspiration, generate NEW questions):
-{q_text}
+{f"Personalization context (user notes): {user_context}" if user_context else ""}
+{ref_block}
 
 ━━━ DELTA LEARN CONTENT PHILOSOPHY ━━━
 You write like a senior engineer who has run 1000+ interviews. Follow these rules EXACTLY:
@@ -347,7 +379,7 @@ Rules:
 Example of valid output (use as formatting reference only — generate NEW content):
 {EXAMPLE_JSON}
 
-Now generate the JSON for "{chapter.title}".'''
+Now generate the JSON for "{topic.title}".'''
 
     # ── AI call ───────────────────────────────────────
 
@@ -394,10 +426,13 @@ Now generate the JSON for "{chapter.title}".'''
                 'closing': '',
             }
 
-    # ── Mermaid → SVG (with code-block fallback) ──────
+    # ── Mermaid → CID-attached PNG (email-safe) ────────
 
-    def _mermaid_to_svg(self, mermaid_src):
-        """Try mmdc CLI; fall back to a styled code block."""
+    _img_counter = 0
+
+    def _mermaid_to_img(self, mermaid_src):
+        """Render Mermaid to PNG via mmdc, return an <img src='cid:...'> tag
+        and stash (cid, png_bytes) into self._inline_images."""
         if not mermaid_src or not mermaid_src.strip():
             return ''
 
@@ -408,55 +443,39 @@ Now generate the JSON for "{chapter.title}".'''
                 src_file.write(mermaid_src)
                 src_path = src_file.name
 
-            out_path = src_path.replace('.mmd', '.svg')
+            out_path = src_path.replace('.mmd', '.png')
 
             result = subprocess.run(
-                [
-                    'mmdc', '-i', src_path, '-o', out_path,
-                    '-t', 'dark',
-                    '-b', 'transparent',
-                    '--configFile', '/dev/null',
-                ],
-                capture_output=True, text=True, timeout=20,
+                ['mmdc', '-i', src_path, '-o', out_path,
+                 '-t', 'dark', '-b', '#141414', '-s', '2'],
+                capture_output=True, text=True, timeout=25,
             )
 
-            svg_file = Path(out_path)
-            if result.returncode == 0 and svg_file.exists():
-                svg_content = svg_file.read_text()
-                svg_file.unlink(missing_ok=True)
+            png_file = Path(out_path)
+            if result.returncode == 0 and png_file.exists():
+                png_bytes = png_file.read_bytes()
+                png_file.unlink(missing_ok=True)
                 Path(src_path).unlink(missing_ok=True)
-                import re as _re
-                svg_content = _re.sub(
-                    r'style="[^"]*max-width:\s*[\d.]+px[^"]*"',
-                    'style="max-width:100%;height:auto"',
-                    svg_content, count=1,
+
+                Command._img_counter += 1
+                cid = f'diagram-{Command._img_counter}'
+                self._inline_images.append((cid, png_bytes))
+
+                return (
+                    f'<img src="cid:{cid}" alt="Diagram" '
+                    f'style="max-width:100%;height:auto;border-radius:6px">'
                 )
-                return svg_content
+
+            Path(src_path).unlink(missing_ok=True)
 
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
             pass
 
-        return self._mermaid_code_block(mermaid_src)
-
-    def _mermaid_code_block(self, mermaid_src):
-        """Render Mermaid source as a styled monospace code block for email."""
-        escaped = html_escape(mermaid_src)
-        lines = escaped.split('\n')
-        formatted = '<br>'.join(
-            f'&nbsp;&nbsp;{line}' if line.startswith('  ') else line
-            for line in lines
-        )
-        return (
-            '<div style="font-family:\'SF Mono\',SFMono-Regular,ui-monospace,'
-            'Menlo,Monaco,Consolas,monospace;font-size:11px;line-height:1.7;'
-            'color:#a1a1a6;white-space:pre-wrap;word-break:break-word;'
-            'padding:4px 0">'
-            f'{formatted}</div>'
-        )
+        return ''
 
     # ── HTML rendering (mirrors frontend App.css) ─────
 
-    def _render_html(self, sub, chapter, accent, data):
+    def _render_html(self, sub, topic, accent, data):
         # Derived colors matching frontend tokens
         accent_subtle = self._hex_to_rgba(accent, 0.10)
         accent_glow = self._hex_to_rgba(accent, 0.08)
@@ -595,7 +614,7 @@ Now generate the JSON for "{chapter.title}".'''
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>DeltaMail — {chapter.title}</title>
+  <title>DeltaMail — {topic.title}</title>
 </head>
 <body style="margin:0;padding:0;background:#1c1c1e;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:#f5f5f7;line-height:1.55">
 
@@ -609,7 +628,7 @@ Now generate the JSON for "{chapter.title}".'''
           <td>
             <h1 style="margin:0;font-size:20px;font-weight:700;color:#f5f5f7;letter-spacing:-0.02em">DeltaMails</h1>
             <p style="margin:4px 0 0;font-size:12px;color:#86868b;line-height:1.4;letter-spacing:0.01em">
-              {sub.subject.name} &middot; Chapter {chapter.chapter_number} &middot; {sub.difficulty.title()}
+              {sub.subject.name} &middot; {sub.difficulty.title()}
             </p>
           </td>
           <td style="text-align:right;vertical-align:middle">
@@ -621,12 +640,12 @@ Now generate the JSON for "{chapter.title}".'''
       </table>
     </div>
 
-    <!-- chapter header -->
+    <!-- topic header -->
     <div style="padding:40px 40px 0">
       <div style="margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid rgba(255,255,255,0.06)">
-        {f'<div style="display:inline-block;padding:3px 10px;border-radius:980px;font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;background:{accent_subtle};color:{accent};margin-bottom:14px">{chapter.part}</div><br>' if chapter.part else ''}
-        <h2 style="margin:0 0 10px;font-size:28px;font-weight:700;color:#f5f5f7;letter-spacing:-0.03em;line-height:1.15">{chapter.title}</h2>
-        {f'<p style="margin:0 0 12px;font-size:15px;color:#86868b;line-height:1.55">{chapter.subtitle}</p>' if chapter.subtitle else ''}
+        {f'<div style="display:inline-block;padding:3px 10px;border-radius:980px;font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;background:{accent_subtle};color:{accent};margin-bottom:14px">{topic.chapter.part}</div><br>' if topic.chapter and topic.chapter.part else ''}
+        <h2 style="margin:0 0 10px;font-size:28px;font-weight:700;color:#f5f5f7;letter-spacing:-0.03em;line-height:1.15">{topic.title}</h2>
+        {f'<p style="margin:0 0 12px;font-size:15px;color:#86868b;line-height:1.55">{", ".join(topic.keywords[:8])}</p>' if topic.keywords else ''}
         {f'<div style="font-family:\'SF Mono\',SFMono-Regular,ui-monospace,Menlo,monospace;font-size:11px;color:#58585d;letter-spacing:0.02em">{total} questions covering the full topic</div>' if total else ''}
       </div>
     </div>
@@ -671,11 +690,13 @@ Now generate the JSON for "{chapter.title}".'''
     # ── diagram rendering helper ──────────────────────
 
     def _render_diagram(self, mermaid_src, caption):
-        """Render a Mermaid diagram for email (matches .mermaid-wrap)."""
+        """Render a Mermaid diagram as an embedded PNG for email."""
         if not mermaid_src or not mermaid_src.strip():
             return ''
 
-        svg_or_code = self._mermaid_to_svg(mermaid_src)
+        img_tag = self._mermaid_to_img(mermaid_src)
+        if not img_tag:
+            return ''
 
         caption_html = ''
         if caption:
@@ -687,7 +708,7 @@ Now generate the JSON for "{chapter.title}".'''
 
         return f'''
               <div style="margin:24px 0;padding:20px 0;text-align:center">
-                <div style="padding:20px 16px;background:#141414;border-radius:10px;border:1px solid rgba(255,255,255,0.04);overflow:auto">{svg_or_code}</div>
+                <div style="padding:16px;background:#141414;border-radius:10px;border:1px solid rgba(255,255,255,0.04)">{img_tag}</div>
                 {caption_html}
               </div>'''
 

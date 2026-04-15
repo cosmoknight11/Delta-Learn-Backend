@@ -217,6 +217,33 @@ class Note(models.Model):
         return f'{self.user.username} — {scope}: {self.content[:50]}'
 
 
+class EmailTopic(models.Model):
+    SOURCE_CHOICES = [
+        ('chapter', 'From Chapter'),
+        ('web', 'Web Search'),
+        ('manual', 'Manual'),
+    ]
+
+    subject = models.ForeignKey(
+        Subject, on_delete=models.CASCADE, related_name='email_topics',
+    )
+    title = models.CharField(max_length=300)
+    keywords = models.JSONField(default=list)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='manual')
+    chapter = models.ForeignKey(
+        Chapter, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='email_topics',
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['subject', 'title']
+
+    def __str__(self):
+        return f'[{self.subject.slug}] {self.title}'
+
+
 class Subscription(models.Model):
     DIFFICULTY_CHOICES = [
         ('easy', 'Easy'),
@@ -253,3 +280,21 @@ class Subscription(models.Model):
 
     def __str__(self):
         return f'{self.email} → {self.subject.slug} ({self.difficulty})'
+
+
+class SentHistory(models.Model):
+    subscription = models.ForeignKey(
+        Subscription, on_delete=models.CASCADE, related_name='sent_history',
+    )
+    topic = models.ForeignKey(
+        EmailTopic, on_delete=models.CASCADE, related_name='sent_history',
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+    questions_json = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ['-sent_at']
+        unique_together = ['subscription', 'topic']
+
+    def __str__(self):
+        return f'{self.subscription.email} — {self.topic.title} ({self.sent_at:%Y-%m-%d})'

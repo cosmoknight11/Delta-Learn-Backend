@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
+    'django_crontab',
     'chapters',
     'users',
 ]
@@ -187,6 +188,15 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False,
 }
+
+# ── Scheduled jobs (django-crontab) ──
+
+CRONJOBS = [
+    # Every day at 7am IST (1:30 UTC) — send daily DeltaMails
+    ('30 1 * * *', 'django.core.management.call_command', ['send_deltamails']),
+    # Every Monday at 3am IST (Sunday 9:30pm UTC) — refresh topic pool
+    ('30 21 * * 0', 'django.core.management.call_command', ['refresh_topics']),
+]
 
 # ── Email (Gmail SMTP) ──
 
