@@ -1,0 +1,323 @@
+{
+  "subject": {
+    "slug": "dsa",
+    "name": "DSA Patterns",
+    "description": "Master coding interviews by pattern, not by problem. Two pointers, sliding window, DP patterns, graphs, and more — with real trade-offs.",
+    "accentColor": "#30d158",
+    "order": 1
+  },
+  "chapters": [
+    {
+      "id": 1,
+      "part": "Part I: Foundations",
+      "title": "Big-O, Time & Space Complexity",
+      "subtitle": "How to analyze algorithms — Big-O notation, amortized analysis, space trade-offs, and what interviewers actually look for in complexity answers",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 2,
+      "part": "Part I: Foundations",
+      "title": "Arrays & Hashing Patterns",
+      "subtitle": "Frequency maps, two-sum variants, grouping, set lookups — the pattern behind 30% of all interview questions",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 3,
+      "part": "Part I: Foundations",
+      "title": "String Manipulation Patterns",
+      "subtitle": "Reversal, anagram detection, palindromes, encoding/decoding — string-specific tricks that come up constantly",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 4,
+      "part": "Part II: Pointer Techniques",
+      "title": "Two Pointers",
+      "subtitle": "Converging, diverging, and same-direction pointers — sorted arrays, pair sums, container problems, partitioning",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 5,
+      "part": "Part II: Pointer Techniques",
+      "title": "Sliding Window",
+      "subtitle": "Fixed and variable-size windows — longest/shortest subarray, max sum, substring problems in O(n)",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 6,
+      "part": "Part II: Pointer Techniques",
+      "title": "Fast & Slow Pointers",
+      "subtitle": "Floyd's cycle detection, finding the middle, detecting loops in linked lists and sequences",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 7,
+      "part": "Part III: Searching & Sorting",
+      "title": "Binary Search Patterns",
+      "subtitle": "Classic, rotated arrays, search space reduction, \"minimum X that satisfies Y\" — the binary search you actually need",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 8,
+      "part": "Part III: Searching & Sorting",
+      "title": "Sorting Algorithms & Custom Comparators",
+      "subtitle": "Merge sort, quick sort, counting sort — plus custom comparators for interview problems like largest number",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 9,
+      "part": "Part III: Searching & Sorting",
+      "title": "Prefix Sum & Difference Arrays",
+      "subtitle": "Range sum queries, subarray sums equal to K, 2D prefix sums — turn O(n) queries into O(1)",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 10,
+      "part": "Part IV: Linear Structures",
+      "title": "Stack Patterns & Monotonic Stack",
+      "subtitle": "Next greater element, valid parentheses, min stack, histogram problems — monotonic stack is the hidden gem",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 11,
+      "part": "Part IV: Linear Structures",
+      "title": "Deque, Monotonic Deque & Queue",
+      "subtitle": "Sliding window max/min with deque, BFS queues, circular buffer — deque is the secret weapon for O(n) window problems",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 12,
+      "part": "Part IV: Linear Structures",
+      "title": "Linked List Patterns",
+      "subtitle": "Reversal, merge, cycle detection, reorder, partition — the 7 patterns that cover every linked list question",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 13,
+      "part": "Part V: Trees",
+      "title": "Binary Tree Traversals & Properties",
+      "subtitle": "Inorder, preorder, postorder, level-order, zigzag — plus diameter, depth, views, symmetric checks, and balanced verification",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 14,
+      "part": "Part V: Trees",
+      "title": "BST, Construction & Serialization",
+      "subtitle": "Validate BST, insert/delete, LCA, Kth smallest — plus construct from traversals, serialize/deserialize, and sorted array/list to BST",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 15,
+      "part": "Part V: Trees",
+      "title": "Tree Paths & Modifications",
+      "subtitle": "Path sum I/II/III, max path sum, root-to-leaf — plus invert, flatten, populate next pointers, and merge trees",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 16,
+      "part": "Part V: Trees",
+      "title": "Trie & Prefix Trees",
+      "subtitle": "Autocomplete, word search, prefix matching — implement a trie and know when it beats a hash map",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 17,
+      "part": "Part VI: Graphs",
+      "title": "Graph BFS & DFS Patterns",
+      "subtitle": "Number of islands, clone graph, bipartite check, flood fill — the two traversals that solve 80% of graph problems",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 18,
+      "part": "Part VI: Graphs",
+      "title": "Shortest Path Algorithms",
+      "subtitle": "Dijkstra, Bellman-Ford, Floyd-Warshall, cheapest flights — when to use each, negative weights, and K-stop constraints",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 19,
+      "part": "Part VI: Graphs",
+      "title": "Topological Sort & DAGs",
+      "subtitle": "Course schedule, alien dictionary, build order — Kahn's BFS and DFS-based approaches for dependency resolution",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 20,
+      "part": "Part VI: Graphs",
+      "title": "Union-Find & Minimum Spanning Trees",
+      "subtitle": "Disjoint set with path compression + union by rank, accounts merge, redundant connection — plus Kruskal's and Prim's MST algorithms",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 21,
+      "part": "Part VI: Graphs",
+      "title": "SCCs, Bridges & Articulation Points",
+      "subtitle": "Kosaraju's and Tarjan's algorithms for strongly connected components, critical connections, bridges — advanced graph connectivity",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 22,
+      "part": "Part VII: Dynamic Programming",
+      "title": "DP Fundamentals",
+      "subtitle": "Memoization vs tabulation, identifying overlapping subproblems, state definition, recurrence relations — the framework before the patterns",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 23,
+      "part": "Part VII: Dynamic Programming",
+      "title": "Linear DP & Kadane's Algorithm",
+      "subtitle": "Climbing stairs, house robber, coin change, max subarray, max product subarray — 1D state problems and the Kadane's family",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 24,
+      "part": "Part VII: Dynamic Programming",
+      "title": "Knapsack: 0/1 & Unbounded",
+      "subtitle": "Subset sum, partition equal subset, target sum, coin change 2, ones and zeroes — each item once vs unlimited reuse",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 25,
+      "part": "Part VII: Dynamic Programming",
+      "title": "String DP & LCS",
+      "subtitle": "Edit distance, word break, LCS, shortest common supersequence, palindrome partitioning, distinct subsequences — two-string table problems",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 26,
+      "part": "Part VII: Dynamic Programming",
+      "title": "LIS & Sequence DP",
+      "subtitle": "Longest increasing subsequence (O(n log n)), Russian doll envelopes, longest chain, wiggle subsequence, delete and earn",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 27,
+      "part": "Part VII: Dynamic Programming",
+      "title": "Grid DP & 2D Traversal",
+      "subtitle": "Unique paths, minimum path sum, maximal square, cherry pickup, dungeon game — grid traversal with cumulative state",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 28,
+      "part": "Part VII: Dynamic Programming",
+      "title": "Interval DP",
+      "subtitle": "Burst balloons, stone game, minimum score triangulation, palindrome partitioning II — DP on ranges trying every split point",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 29,
+      "part": "Part VII: Dynamic Programming",
+      "title": "DP on Trees",
+      "subtitle": "House robber III, binary tree cameras, max BST sum, longest zigzag — combining DFS traversal with DP state transitions",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 30,
+      "part": "Part VII: Dynamic Programming",
+      "title": "Bitmask & Digit DP",
+      "subtitle": "TSP, partition to K equal subsets, shortest path visiting all nodes, numbers with repeated digits — encoding state as bitmasks and digit constraints",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 31,
+      "part": "Part VII: Dynamic Programming",
+      "title": "Multi-Dimension & State Machine DP",
+      "subtitle": "Stock buy/sell series, dice rolls, frog jump, knight dialer, graph DP — problems with 2-3 state dimensions and state transitions",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 32,
+      "part": "Part VIII: Advanced Patterns",
+      "title": "Greedy Algorithms & Proof Patterns",
+      "subtitle": "Activity selection, jump game, gas station — the greedy choice property and how to prove correctness in interviews",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 33,
+      "part": "Part VIII: Advanced Patterns",
+      "title": "Backtracking",
+      "subtitle": "Subsets, permutations, combinations, N-Queens, Sudoku — the template that solves every generate-all-solutions problem",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 34,
+      "part": "Part VIII: Advanced Patterns",
+      "title": "Heap & Priority Queue (Top-K)",
+      "subtitle": "Kth largest, merge K sorted lists, median of stream — min-heap vs max-heap and the top-K pattern",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 35,
+      "part": "Part VIII: Advanced Patterns",
+      "title": "Intervals & Scheduling",
+      "subtitle": "Merge intervals, insert interval, meeting rooms — sort by start/end and sweep line technique",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 36,
+      "part": "Part VIII: Advanced Patterns",
+      "title": "Bit Manipulation Tricks",
+      "subtitle": "Single number, counting bits, power of two, XOR tricks — bitwise operations that turn O(n) into O(1)",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 37,
+      "part": "Part VIII: Advanced Patterns",
+      "title": "Math & Number Theory",
+      "subtitle": "GCD, primes, modular arithmetic, random sampling — the math patterns that show up in unexpected places",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 38,
+      "part": "Part IX: Design",
+      "title": "Design Data Structures",
+      "subtitle": "LRU Cache, LFU Cache, Min Stack, RandomizedSet — combine multiple data structures into one elegant design",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 39,
+      "part": "Part IX: Design",
+      "title": "Segment Trees & Fenwick Trees",
+      "subtitle": "Range queries and point updates in O(log n) — when prefix sums aren't enough and you need dynamic updates",
+      "questions": [],
+      "takeaways": []
+    }
+  ]
+}

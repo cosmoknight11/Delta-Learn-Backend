@@ -1,0 +1,381 @@
+{
+  "subject": {
+    "slug": "ai",
+    "name": "AI for Engineers",
+    "description": "LLMs, agents, prompt engineering, RAG, and production AI systems — the practical knowledge every software engineer needs now.",
+    "accentColor": "#ff9f0a",
+    "order": 2
+  },
+  "chapters": [
+    {
+      "id": 1,
+      "part": "Part I: Foundations",
+      "title": "LLM Fundamentals for Engineers",
+      "subtitle": "Tokens, context windows, temperature, model selection — the practical knowledge every engineer needs before building with AI.",
+      "questions": [
+        {
+          "question": "Your PM asks you to \"add AI\" to the product. Before writing a single line of code, what do you need to understand about how LLMs actually work?",
+          "difficulty": "easy",
+          "tldr": "LLMs are next-token predictors trained on massive text corpora. They don't \"think\" — they calculate the most probable next token given the context window.",
+          "answer": "<p>An LLM (Large Language Model) is a neural network trained to predict the next token in a sequence. \"Token\" is the atomic unit — roughly 3/4 of a word in English. When you send a prompt, the model processes all tokens, builds an internal representation, and generates one token at a time until it produces a stop token.</p>",
+          "diagram": "graph LR\n  Input[\"Prompt tokens\"] --> Model[\"LLM<br/>Transformer\"]\n  Model --> T1[\"Token 1\"]\n  T1 --> T2[\"Token 2\"]\n  T2 --> T3[\"Token 3\"]\n  T3 --> Stop[\"Stop token\"]\n  style Model fill:#bf5af2,color:#fff",
+          "diagramCaption": "Autoregressive generation — each token is predicted one at a time",
+          "points": [
+            "<strong>Tokens, not words</strong> — \"ChatGPT\" is 3 tokens: \"Chat\", \"G\", \"PT\". A 4K token limit is roughly 3,000 words. <mark>Always think in tokens, not characters or words.</mark> Use a tokenizer tool to count exactly.",
+            "<strong>Context window</strong> — The maximum tokens the model can \"see\" at once (input + output). GPT-4o: 128K. Claude 3.5: 200K. Gemini: 1M+. Your entire prompt + conversation history + system prompt must fit within this.",
+            "<strong>No memory between calls</strong> — Each API call is stateless. The model doesn't remember your last request unless you re-send the conversation history. Chat apps simulate memory by including prior messages in every request.",
+            "<strong>Training vs inference</strong> — Training = learning from data (months, millions of dollars). Inference = generating output from a trained model (milliseconds, fractions of a cent). You do inference. Only model providers do training."
+          ],
+          "followup": "<p><strong>\"If it's just predicting the next token, how does it reason or write code?\"</strong></p><p>Scale creates emergent capabilities. A model trained on billions of code examples learns patterns of correct code — variable naming, control flow, error handling — without being explicitly programmed to code. It's pattern matching at a scale where patterns become indistinguishable from reasoning. <mark>But it can still confidently produce wrong answers (hallucinations) because it optimizes for plausibility, not correctness.</mark></p>"
+        },
+        {
+          "question": "I see temperature, top_p, max_tokens in the API. What do these actually control, and what should I set them to?",
+          "difficulty": "medium",
+          "tldr": "Temperature controls randomness (0 = deterministic, 1 = creative). max_tokens caps output length. top_p is an alternative to temperature. For most engineering tasks, use temperature 0.",
+          "answer": "<p>These parameters control the token selection strategy. At each step, the model produces a probability distribution over all possible next tokens. The parameters determine how you sample from that distribution.</p>",
+          "table": {
+            "headers": [
+              "Parameter",
+              "What It Does",
+              "Low Value",
+              "High Value",
+              "Recommended"
+            ],
+            "rows": [
+              [
+                "<strong>temperature</strong>",
+                "Scales the probability distribution",
+                "0 = always pick highest probability token",
+                "1+ = flatten distribution, more random",
+                "0 for code/data extraction. 0.7 for creative writing."
+              ],
+              [
+                "<strong>top_p</strong>",
+                "Nucleus sampling — only consider tokens within cumulative probability p",
+                "0.1 = only top few tokens considered",
+                "1.0 = all tokens considered",
+                "0.95 default. Don't change both temperature AND top_p."
+              ],
+              [
+                "<strong>max_tokens</strong>",
+                "Maximum output tokens generated",
+                "Short responses",
+                "Long responses (but costs more)",
+                "Set based on expected output. 1024 for summaries, 4096 for code generation."
+              ],
+              [
+                "<strong>stop</strong>",
+                "Stop generating when this string appears",
+                "—",
+                "—",
+                "Useful for structured output: stop at closing bracket or delimiter."
+              ]
+            ]
+          },
+          "points": [
+            "<strong>Temperature 0 for engineering</strong> — <mark>For code generation, data extraction, classification, and any task where you want reproducible results, always use temperature 0.</mark> Higher temperatures introduce randomness that causes bugs.",
+            "<strong>Don't set both temperature and top_p</strong> — They do similar things differently. Pick one. Most engineers use temperature only.",
+            "<strong>max_tokens is a hard cutoff</strong> — If your output needs 500 tokens and you set max_tokens to 200, the response will be truncated mid-sentence. Always set it higher than your expected output, but not wastefully high (you pay for output tokens)."
+          ]
+        },
+        {
+          "question": "There are dozens of models — GPT-4o, Claude Sonnet, Gemini, open-source. How do I choose one for my feature?",
+          "difficulty": "medium",
+          "tldr": "Match the model to the task: small/fast models for classification and extraction, large models for reasoning and generation. Cost and latency matter more than benchmarks.",
+          "answer": "<p>Model selection is an engineering decision, not a religious one. The best model is the cheapest one that meets your quality bar.</p>",
+          "table": {
+            "headers": [
+              "Use Case",
+              "Model Tier",
+              "Examples",
+              "Why"
+            ],
+            "rows": [
+              [
+                "Classification, extraction, routing",
+                "Small/fast",
+                "GPT-4o-mini, Claude Haiku, Gemini Flash",
+                "Simple tasks. <1s latency. Pennies per 1K calls."
+              ],
+              [
+                "Code generation, analysis, summarization",
+                "Medium",
+                "GPT-4o, Claude Sonnet, Gemini Pro",
+                "Good quality/cost balance. 1-3s latency."
+              ],
+              [
+                "Complex reasoning, architecture, research",
+                "Large/frontier",
+                "Claude Opus, GPT-4.5, Gemini Ultra",
+                "Best quality but 5-15s latency, 10x cost."
+              ],
+              [
+                "Privacy-sensitive, on-prem, fine-tuning",
+                "Open-source",
+                "Llama 3, Mistral, Qwen",
+                "Full control. No data leaves your infrastructure."
+              ]
+            ]
+          },
+          "points": [
+            "<strong>Start small, scale up</strong> — <mark>Always start with the cheapest model and only upgrade if quality is insufficient.</mark> GPT-4o-mini handles 80% of production use cases. Don't default to the frontier model.",
+            "<strong>Latency vs quality trade-off</strong> — Frontier models take 5-15 seconds. For real-time user-facing features, a fast model with 90% accuracy beats a slow model with 95% accuracy.",
+            "<strong>Cost math matters</strong> — At 1M requests/day, the difference between $0.15/1M tokens (mini) and $5/1M tokens (frontier) is $4,850/day. Build a cost model before choosing.",
+            "<strong>Evaluate on YOUR data</strong> — Benchmarks (MMLU, HumanEval) don't predict performance on your specific task. Build a test set of 50-100 examples from your domain and evaluate each model against it."
+          ],
+          "followup": "<p><strong>\"When should I consider fine-tuning vs prompt engineering vs RAG?\"</strong></p><p>Decision tree: (1) Can you solve it with a better prompt? Try that first — cheapest, fastest. (2) Does the model need domain knowledge it doesn't have? Use RAG — retrieve relevant docs and inject into context. (3) Does the model need to behave in a specific way consistently (tone, format, domain-specific reasoning)? Fine-tune. <mark>90% of production AI features use prompt engineering + RAG. Fine-tuning is the last resort.</mark></p>"
+        },
+        {
+          "question": "What's the actual cost structure? My CFO is asking me to estimate the AI budget for next quarter.",
+          "difficulty": "easy",
+          "tldr": "You pay per token — input tokens and output tokens priced separately. Output tokens cost 2-4x more than input. Estimate: daily calls x avg tokens x price per token.",
+          "answer": "<p>LLM APIs charge per token processed. Input tokens (your prompt) and output tokens (the response) have different prices, with output always costing more because generation is computationally harder than encoding.</p>",
+          "table": {
+            "headers": [
+              "Model",
+              "Input (per 1M tokens)",
+              "Output (per 1M tokens)",
+              "~Cost per 1K calls (avg)"
+            ],
+            "rows": [
+              [
+                "GPT-4o-mini",
+                "$0.15",
+                "$0.60",
+                "$0.04"
+              ],
+              [
+                "GPT-4o",
+                "$2.50",
+                "$10.00",
+                "$0.63"
+              ],
+              [
+                "Claude Sonnet",
+                "$3.00",
+                "$15.00",
+                "$0.90"
+              ],
+              [
+                "Claude Opus",
+                "$15.00",
+                "$75.00",
+                "$4.50"
+              ]
+            ]
+          },
+          "points": [
+            "<strong>Budget formula</strong> — <code>(daily_calls x avg_input_tokens x input_price) + (daily_calls x avg_output_tokens x output_price) x 30</code>. For 100K calls/day with GPT-4o-mini at ~500 tokens each: roughly $120/month.",
+            "<strong>Output tokens dominate cost</strong> — Output is 2-5x more expensive than input. <mark>Set max_tokens wisely and use stop sequences to avoid generating unnecessary tokens.</mark>",
+            "<strong>Caching reduces cost</strong> — Many providers offer prompt caching (Anthropic, OpenAI). If your system prompt is 2K tokens and you send 100K requests/day, caching saves you 200M input tokens/day — potentially thousands of dollars.",
+            "<strong>Batch API for non-real-time</strong> — OpenAI and Anthropic offer 50% discounts for batch processing (results within 24 hours). Use for analytics, content generation, and any non-user-facing task."
+          ]
+        },
+        {
+          "question": "I keep hearing about \"hallucinations.\" My feature can't afford wrong answers. How do I make the model reliable?",
+          "difficulty": "hard",
+          "tldr": "You can't eliminate hallucinations, but you can reduce and detect them: constrain output format, use RAG for factual grounding, validate with code, and never trust the model for critical decisions without verification.",
+          "answer": "<p>Hallucination is when the model generates plausible-sounding but factually incorrect output. It happens because the model optimizes for token probability, not truth. <mark>Every production AI system must assume the model WILL hallucinate and design defenses accordingly.</mark></p>",
+          "points": [
+            "<strong>Constrain the output</strong> — Use structured output (JSON mode, tool_use) so the model fills fields rather than free-writing. Easier to validate: \"is this a valid product ID?\" vs \"is this paragraph factually correct?\"",
+            "<strong>Ground with RAG</strong> — Retrieve relevant documents from your database and inject them into the prompt. The model answers based on provided context, not its training data. This dramatically reduces hallucination for domain-specific facts.",
+            "<strong>Validate programmatically</strong> — If the model generates a SQL query, run EXPLAIN on it before executing. If it generates a function, run your test suite. If it extracts data, cross-check against the source.",
+            "<strong>Confidence signals</strong> — Ask the model to rate its confidence or cite sources from the provided context. Low confidence or inability to cite = likely hallucination. Not foolproof, but useful as a filter.",
+            "<strong>Human-in-the-loop for high stakes</strong> — <mark>For medical, financial, or legal decisions: the model drafts, a human approves.</mark> Never deploy autonomous AI in high-stakes domains without review."
+          ],
+          "followup": "<p><strong>\"Can I quantify the hallucination rate? How do I monitor it in production?\"</strong></p><p>Build an evaluation pipeline: (1) Curate a test set of 100+ questions with known answers. (2) Run the model weekly and measure accuracy. (3) In production, log model outputs and sample 1-5% for human review. (4) Track the \"refusal rate\" — a well-configured model should refuse when unsure rather than guess. <mark>If you can't measure hallucination rate, you can't put it in production.</mark></p>"
+        },
+        {
+          "question": "Walk me through a real API call. I'm sending my first request to Claude or GPT — what does the request and response actually look like?",
+          "difficulty": "easy",
+          "tldr": "You send a messages array with roles (system, user, assistant) and get back a completion with the assistant's response, token usage, and metadata.",
+          "answer": "<p>Every LLM API follows the same pattern: you send a conversation as a list of messages, and get back the next assistant message. The system message sets behavior, user messages are the human's input, and assistant messages are the model's prior responses (for multi-turn context).</p>",
+          "diagram": "sequenceDiagram\n  participant App as Your App\n  participant API as LLM API\n  App->>API: POST /messages\n  Note over App: system + user messages\n  API-->>App: assistant message\n  Note over App: + token usage + stop reason",
+          "diagramCaption": "Basic LLM API call — send messages, receive completion",
+          "points": [
+            "<strong>Messages array</strong> — <code>[{role: \"system\", content: \"You are a...\"}, {role: \"user\", content: \"Summarize this...\"}]</code>. System sets the persona. User provides the task. For multi-turn, include previous assistant messages.",
+            "<strong>System prompt is critical</strong> — <mark>The system prompt is the most important part of your application.</mark> It defines behavior, constraints, output format, and tone. Treat it like production code — version it, test it, review changes.",
+            "<strong>Streaming</strong> — For user-facing features, always stream the response (SSE). The first token arrives in ~200ms instead of waiting 3-10 seconds for the full response. ChatGPT, Copilot, and every production chat UI uses streaming.",
+            "<strong>Error handling</strong> — Rate limits (429), context length exceeded (400), model overloaded (529). Implement exponential backoff for retries. <mark>Always set a timeout — a hung API call that never returns is worse than a fast failure.</mark>"
+          ]
+        },
+        {
+          "question": "You said context window is limited. My app has a 50-page document and a long conversation history. How do I manage context?",
+          "difficulty": "hard",
+          "tldr": "Prioritize what goes into context: system prompt first, relevant retrieved chunks (RAG), recent conversation, then truncate the rest. Token budget is finite — allocate it deliberately.",
+          "answer": "<p>Context window management is the core engineering challenge of building with LLMs. You have a fixed token budget and multiple competing demands for space.</p>",
+          "diagram": "graph TD\n  CW[\"Context Window<br/>128K tokens\"] --> SP[\"System Prompt<br/>~500 tokens\"]\n  CW --> RAG[\"Retrieved Docs<br/>~4K tokens\"]\n  CW --> History[\"Recent Messages<br/>~2K tokens\"]\n  CW --> User[\"Current Query<br/>~200 tokens\"]\n  CW --> Output[\"Reserved for Output<br/>~2K tokens\"]\n  style CW fill:#bf5af2,color:#fff",
+          "diagramCaption": "Context window budget — every token is a trade-off",
+          "points": [
+            "<strong>Token budget allocation</strong> — System prompt (fixed, ~500). Retrieved context from RAG (variable, 2-8K). Conversation history (sliding window of last N messages). User query (variable). Output reservation (max_tokens). <mark>Total must be less than context window limit.</mark>",
+            "<strong>Chunking for large documents</strong> — Split documents into ~500 token chunks with overlap (~50 tokens). Store chunks with embeddings in a vector database. At query time, retrieve only the 3-5 most relevant chunks. This is RAG.",
+            "<strong>Conversation summarization</strong> — For long conversations, summarize older messages into a condensed form: \"Previous context: user asked about X, you recommended Y.\" Keep recent messages verbatim, compress older ones.",
+            "<strong>Longer context != better</strong> — Research shows models perform worse with very long contexts (\"lost in the middle\" problem). <mark>Relevant information at the beginning and end of the context is recalled best. The middle is often ignored.</mark> Be selective, not exhaustive."
+          ],
+          "followup": "<p><strong>\"What if the document is 200 pages and the user asks a question about page 150?\"</strong></p><p>This is where RAG shines. Chunk the document, embed all chunks, store in a vector DB (Pinecone, pgvector, Chroma). When the user asks a question, embed the question, find the top 5 most similar chunks (which will include the relevant part of page 150), and inject only those chunks into the context. The model never sees all 200 pages — just the 5 relevant chunks. Cost: ~2K tokens instead of ~100K.</p>"
+        }
+      ],
+      "takeaways": [
+        "<strong>LLMs predict tokens</strong> — Autoregressive, next-token prediction. No real \"understanding.\" Pattern matching at scale.",
+        "<strong>Temperature 0 for engineering</strong> — Deterministic output. Higher values for creative tasks only.",
+        "<strong>Start with the cheapest model</strong> — GPT-4o-mini handles 80% of use cases. Upgrade only if quality is insufficient.",
+        "<strong>Output tokens cost 2-5x more</strong> — Set max_tokens wisely. Use stop sequences. Enable prompt caching.",
+        "<strong>Hallucinations are guaranteed</strong> — Constrain output, ground with RAG, validate programmatically, human-in-the-loop for high stakes.",
+        "<strong>System prompt is production code</strong> — Version it, test it, review changes. It's the most important part of your AI feature.",
+        "<strong>Context is a budget</strong> — Allocate tokens deliberately: system prompt, RAG chunks, recent history, query, output reservation."
+      ]
+    },
+    {
+      "id": 2,
+      "part": "Part I: Foundations",
+      "title": "API Integration (Claude & OpenAI)",
+      "subtitle": "SDK setup, streaming responses, error handling, rate limits, retries — building your first production LLM integration",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 3,
+      "part": "Part I: Foundations",
+      "title": "Tools & Function Calling",
+      "subtitle": "tool_use, schema design, execution flow — letting the model take actions in the real world safely",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 4,
+      "part": "Part II: Agent Architecture",
+      "title": "Agent Frameworks & SDK Core",
+      "subtitle": "LangChain, CrewAI, Claude Agent SDK — when to use a framework vs build from scratch",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 5,
+      "part": "Part II: Agent Architecture",
+      "title": "Multi-Agent Systems",
+      "subtitle": "Orchestration, delegation, handoffs — designing systems where multiple agents collaborate on complex tasks",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 6,
+      "part": "Part II: Agent Architecture",
+      "title": "Model Context Protocol (MCP)",
+      "subtitle": "Servers, resources, tools, transport — the open standard for connecting AI to external data and actions",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 7,
+      "part": "Part II: Agent Architecture",
+      "title": "Error Handling in AI Systems",
+      "subtitle": "Retries, fallbacks, circuit breakers, graceful degradation — when the model fails, your system shouldn't",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 8,
+      "part": "Part III: AI-Powered Dev",
+      "title": "AI Configuration Files",
+      "subtitle": "CLAUDE.md, .cursorrules, system prompts — configuring AI tools for your codebase and team",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 9,
+      "part": "Part III: AI-Powered Dev",
+      "title": "Skills, Custom Commands & Workflows",
+      "subtitle": "Building reusable AI capabilities — custom slash commands, skill files, and automated workflows",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 10,
+      "part": "Part III: AI-Powered Dev",
+      "title": "AI in CI/CD & Code Review",
+      "subtitle": "Automated PR reviews, test generation, commit message writing — integrating AI into your development pipeline",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 11,
+      "part": "Part IV: Prompt Engineering",
+      "title": "Few-Shot Prompting & Chain-of-Thought",
+      "subtitle": "Examples in prompts, step-by-step reasoning, self-consistency — the techniques that double model accuracy",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 12,
+      "part": "Part IV: Prompt Engineering",
+      "title": "Structured Output & JSON Mode",
+      "subtitle": "Forcing JSON/XML output, schema validation, Pydantic integration — reliable machine-readable responses",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 13,
+      "part": "Part IV: Prompt Engineering",
+      "title": "Validation, Guardrails & Safety",
+      "subtitle": "Input/output validation, content filtering, jailbreak prevention — keeping your AI system safe and on-task",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 14,
+      "part": "Part IV: Prompt Engineering",
+      "title": "Batch Processing & Cost Optimization",
+      "subtitle": "Batch APIs, prompt caching, token optimization — cutting your AI bill by 50-80% without sacrificing quality",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 15,
+      "part": "Part V: Production Patterns",
+      "title": "Context Window Management & Chunking",
+      "subtitle": "Token budgets, sliding windows, summarization, document chunking — fitting the world into a fixed window",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 16,
+      "part": "Part V: Production Patterns",
+      "title": "RAG: Retrieval Augmented Generation",
+      "subtitle": "Vector search, chunking strategies, reranking, hybrid search — grounding LLM responses in your data",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 17,
+      "part": "Part V: Production Patterns",
+      "title": "Embeddings, Vector DBs & Semantic Search",
+      "subtitle": "What embeddings are, pgvector vs Pinecone vs Chroma, similarity metrics — the infrastructure behind RAG",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 18,
+      "part": "Part V: Production Patterns",
+      "title": "Human-in-the-Loop & Escalation",
+      "subtitle": "Confidence thresholds, approval workflows, escalation chains — when the AI should stop and ask a human",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 19,
+      "part": "Part VI: Applications",
+      "title": "AI Code Generation, Review & Testing",
+      "subtitle": "Copilot patterns, automated test generation, code review bots — practical AI in the software development lifecycle",
+      "questions": [],
+      "takeaways": []
+    },
+    {
+      "id": 20,
+      "part": "Part VI: Applications",
+      "title": "Building AI-Native Products",
+      "subtitle": "Chat UIs, AI-first features, evaluation pipelines, A/B testing AI — shipping AI products users actually trust",
+      "questions": [],
+      "takeaways": []
+    }
+  ]
+}
