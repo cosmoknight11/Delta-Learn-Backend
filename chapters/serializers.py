@@ -2,7 +2,11 @@ from rest_framework import serializers
 from .models import Subject, Chapter, Question, Takeaway, Highlight, Note
 
 
-class QuestionSerializer(serializers.ModelSerializer):
+# ────────────────────────────────────────────────────
+#  Public read serializers  (consumed by the frontend)
+# ────────────────────────────────────────────────────
+
+class QuestionReadSerializer(serializers.ModelSerializer):
     table = serializers.JSONField(source='table_data', default=None)
     diagramCaption = serializers.CharField(source='diagram_caption')
     diagram2Caption = serializers.CharField(source='diagram2_caption')
@@ -16,7 +20,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         ]
 
 
-class TakeawaySerializer(serializers.ModelSerializer):
+class TakeawayReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Takeaway
         fields = ['content']
@@ -39,7 +43,7 @@ class ChapterDetailSerializer(serializers.ModelSerializer):
     """Full serializer with nested questions and takeaways."""
     id = serializers.IntegerField(source='chapter_number')
     _dbId = serializers.IntegerField(source='pk', read_only=True)
-    questions = QuestionSerializer(many=True, read_only=True)
+    questions = QuestionReadSerializer(many=True, read_only=True)
     takeaways = serializers.SerializerMethodField()
 
     class Meta:
@@ -77,6 +81,52 @@ class SubjectDetailSerializer(serializers.ModelSerializer):
         model = Subject
         fields = ['slug', 'name', 'description', 'accentColor', 'chapters']
 
+
+# ────────────────────────────────────────────────────
+#  Admin CRUD serializers  (staff-only write ops)
+# ────────────────────────────────────────────────────
+
+class SubjectWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subject
+        fields = ['id', 'slug', 'name', 'description', 'accent_color', 'order']
+        read_only_fields = ['id']
+
+
+class TakeawayWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Takeaway
+        fields = ['id', 'chapter', 'order', 'content']
+        read_only_fields = ['id']
+
+
+class QuestionWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Question
+        fields = [
+            'id', 'chapter', 'order', 'question', 'difficulty', 'tldr',
+            'answer', 'points', 'diagram', 'diagram_caption',
+            'diagram2', 'diagram2_caption', 'table_data', 'followup',
+        ]
+        read_only_fields = ['id']
+
+
+class ChapterWriteSerializer(serializers.ModelSerializer):
+    questions = QuestionWriteSerializer(many=True, read_only=True)
+    takeaways = TakeawayWriteSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Chapter
+        fields = [
+            'id', 'subject', 'chapter_number', 'part', 'title',
+            'subtitle', 'order', 'questions', 'takeaways',
+        ]
+        read_only_fields = ['id']
+
+
+# ────────────────────────────────────────────────────
+#  User-scoped serializers  (highlights & notes)
+# ────────────────────────────────────────────────────
 
 class HighlightSerializer(serializers.ModelSerializer):
     chapter_slug = serializers.SerializerMethodField()

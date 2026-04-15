@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'drf_spectacular',
     'chapters',
     'users',
 ]
@@ -142,6 +143,33 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_PAGINATION_CLASS': None,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Delta Learn API',
+    'DESCRIPTION': (
+        'Backend API for the Delta Learn interview-prep platform.\n\n'
+        '## Authentication\n'
+        'Most content endpoints are public. Admin CRUD and user-specific '
+        'endpoints (highlights, notes) require a JWT Bearer token.\n\n'
+        'Obtain tokens via `POST /api/auth/login/` then pass '
+        '`Authorization: Bearer <access_token>` on subsequent requests.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'TAGS': [
+        {'name': 'Subjects', 'description': 'Public subject listing and details'},
+        {'name': 'Chapters', 'description': 'Public chapter content'},
+        {'name': 'Admin — Subjects', 'description': 'CRUD operations on subjects (staff only)'},
+        {'name': 'Admin — Chapters', 'description': 'CRUD operations on chapters (staff only)'},
+        {'name': 'Admin — Questions', 'description': 'CRUD operations on questions (staff only)'},
+        {'name': 'Admin — Takeaways', 'description': 'CRUD operations on takeaways (staff only)'},
+        {'name': 'Highlights', 'description': 'User text highlights'},
+        {'name': 'Notes', 'description': 'User notes with AI analysis'},
+        {'name': 'Auth', 'description': 'Registration, login, token management'},
+    ],
 }
 
 from datetime import timedelta  # noqa: E402
