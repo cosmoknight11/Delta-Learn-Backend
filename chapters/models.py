@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 
 
 class Subject(models.Model):
@@ -125,6 +125,7 @@ class StagedRequest(models.Model):
         ('chapter', 'Chapter'),
         ('question', 'Question'),
         ('takeaway', 'Takeaway'),
+        ('chapter_populate', 'Chapter Populate'),
     ]
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -161,27 +162,62 @@ class StagedRequest(models.Model):
         """Execute the staged operation against the real models."""
         from django.utils import timezone
 
-        model_map = {
-            'subject': Subject,
-            'chapter': Chapter,
-            'question': Question,
-            'takeaway': Takeaway,
-        }
-        model_cls = model_map[self.target_model]
-        payload = dict(self.payload)
+        if self.target_model == 'chapter_populate':
+            self._apply_chapter_populate()
+        else:
+            model_map = {
+                'subject': Subject,
+                'chapter': Chapter,
+                'question': Question,
+                'takeaway': Takeaway,
+            }
+            model_cls = model_map[self.target_model]
+            payload = dict(self.payload)
 
-        if self.operation == 'create':
-            obj = model_cls.objects.create(**payload)
-            self.target_id = obj.pk
-        elif self.operation == 'update':
-            model_cls.objects.filter(pk=self.target_id).update(**payload)
-        elif self.operation == 'delete':
-            model_cls.objects.filter(pk=self.target_id).delete()
+            if self.operation == 'create':
+                obj = model_cls.objects.create(**payload)
+                self.target_id = obj.pk
+            elif self.operation == 'update':
+                model_cls.objects.filter(pk=self.target_id).update(**payload)
+            elif self.operation == 'delete':
+                model_cls.objects.filter(pk=self.target_id).delete()
 
         self.status = 'approved'
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
         self.save()
+
+    @transaction.atomic
+    def _apply_chapter_populate(self):
+        chapter = Chapter.objects.get(pk=self.target_id)
+        payload = self.payload
+
+        chapter.questions.all().delete()
+        chapter.takeaways.all().delete()
+
+        for idx, q in enumerate(payload.get('questions', []), start=1):
+            Question.objects.create(
+                chapter=chapter,
+                order=q.get('order', idx),
+                question=q['question'],
+                difficulty=q.get('difficulty', 'medium'),
+                tldr=q.get('tldr', ''),
+                answer=q.get('answer', ''),
+                points=q.get('points', []),
+                diagram=q.get('diagram', ''),
+                diagram_caption=q.get('diagram_caption', ''),
+                diagram2=q.get('diagram2', ''),
+                diagram2_caption=q.get('diagram2_caption', ''),
+                table_data=q.get('table_data'),
+                followup=q.get('followup', ''),
+            )
+
+        for idx, t in enumerate(payload.get('takeaways', []), start=1):
+            Takeaway.objects.create(
+                chapter=chapter,
+                order=t.get('order', idx),
+                content=t['content'],
+            )
 
     def reject(self, reviewer, note=''):
         from django.utils import timezone

@@ -259,6 +259,40 @@ class AdminChapterPopulateView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(tags=['Admin — Chapters'])
+class AdminChapterStagePopulateView(APIView):
+    """Stage a full chapter populate as a single reviewable request.
+
+    Creates a StagedRequest with target_model='chapter_populate'.
+    Admin reviews and approves it in Django admin to apply.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        chapter = get_object_or_404(Chapter.objects.select_related('subject'), pk=pk)
+        questions_data = request.data.get('questions', [])
+        takeaways_data = request.data.get('takeaways', [])
+
+        if not questions_data:
+            return Response(
+                {'detail': 'At least one question is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sr = StagedRequest.objects.create(
+            operation='create',
+            target_model='chapter_populate',
+            target_id=chapter.pk,
+            payload={
+                'chapter_title': str(chapter),
+                'questions': questions_data,
+                'takeaways': takeaways_data,
+            },
+            requested_by=request.user,
+        )
+        return Response(StagedRequestSerializer(sr).data, status=status.HTTP_201_CREATED)
+
+
 # ────────────────────────────────────────────────────
 #  Authenticated views  (user-scoped)
 # ────────────────────────────────────────────────────

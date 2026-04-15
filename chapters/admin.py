@@ -314,6 +314,98 @@ class StagedRequestAdmin(admin.ModelAdmin):
             )
             return mark_safe(html)
 
+        elif model == 'chapter_populate':
+            chapter_title = p.get('chapter_title', f'Chapter #{obj.target_id}')
+            questions = p.get('questions', [])
+            takeaways = p.get('takeaways', [])
+
+            html = f'<div style="{css}">'
+            html += (
+                f'<div style="margin-bottom:16px;padding:10px 14px;background:rgba(10,132,255,0.1);'
+                f'border-radius:8px;border:1px solid rgba(10,132,255,0.25);">'
+                f'<span style="color:#0a84ff;font-weight:700;font-size:0.8rem;text-transform:uppercase;">FULL CHAPTER POPULATE</span>'
+                f'<div style="color:#ccc;margin-top:4px;">{chapter_title}</div>'
+                f'<div style="{meta_css}">{len(questions)} questions · {len(takeaways)} takeaways — replaces all existing content</div>'
+                f'</div>'
+            )
+
+            for i, q in enumerate(questions, 1):
+                diff = q.get('difficulty', '')
+                diff_colors = {'easy': '#30d158', 'medium': '#ff9f0a', 'hard': '#ff453a'}
+                dc = diff_colors.get(diff, '#888')
+                html += (
+                    f'<div style="margin:16px 0 0;padding:16px;background:rgba(255,255,255,0.03);'
+                    f'border-radius:10px;border:1px solid rgba(255,255,255,0.06);">'
+                )
+                html += f'<span style="color:#86868b;font-size:0.75rem;font-weight:600;">Q{i}</span> '
+                html += f'<span style="background:{dc};color:#fff;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:600;text-transform:uppercase;">{diff}</span>'
+                html += f'<h4 style="color:#fff;font-size:1.05rem;margin:8px 0 4px;font-weight:600;">{q.get("question", "")}</h4>'
+
+                tldr = q.get('tldr', '')
+                if tldr:
+                    html += f'<div style="{meta_css}"><em>TL;DR: {tldr}</em></div>'
+
+                answer = q.get('answer', '')
+                if answer:
+                    answer = answer.replace('<mark>', f'<mark style="{mark_css}">').replace('<strong>', f'<strong style="{strong_css}">')
+                    html += f'<div style="margin:8px 0;color:#ddd;font-size:0.9rem;">{answer}</div>'
+
+                points = q.get('points', [])
+                if points:
+                    for pt in points:
+                        pt_html = pt.replace('<mark>', f'<mark style="{mark_css}">').replace('<strong>', f'<strong style="{strong_css}">')
+                        html += f'<div style="{point_css} font-size:0.88rem;">{pt_html}</div>'
+
+                table = q.get('table_data')
+                if table and isinstance(table, dict):
+                    headers = table.get('headers', [])
+                    rows = table.get('rows', [])
+                    html += f'<table style="{table_css}"><thead><tr>'
+                    for h in headers:
+                        html += f'<th style="{th_css}">{h}</th>'
+                    html += '</tr></thead><tbody>'
+                    for row in rows:
+                        html += '<tr>'
+                        for cell in row:
+                            html += f'<td style="{td_css}">{cell}</td>'
+                        html += '</tr>'
+                    html += '</tbody></table>'
+
+                diagram = q.get('diagram', '')
+                if diagram:
+                    html += (
+                        f'<div style="margin:8px 0;padding:8px;background:rgba(10,132,255,0.08);'
+                        f'border-radius:6px;border:1px solid rgba(10,132,255,0.2);">'
+                        f'<div style="color:#0a84ff;font-size:0.7rem;font-weight:600;">MERMAID</div>'
+                        f'<pre style="color:#aaa;font-size:0.75rem;white-space:pre-wrap;margin:4px 0 0;">{diagram}</pre>'
+                        f'</div>'
+                    )
+
+                followup = q.get('followup', '')
+                if followup:
+                    followup = followup.replace('<mark>', f'<mark style="{mark_css}">').replace('<strong>', f'<strong style="{strong_css}">')
+                    html += (
+                        f'<div style="margin:8px 0 0;padding:8px;background:rgba(191,90,242,0.08);'
+                        f'border-radius:6px;border-left:3px solid #bf5af2;font-size:0.88rem;">'
+                        f'<span style="color:#bf5af2;font-size:0.7rem;font-weight:600;">FOLLOW-UP</span> {followup}</div>'
+                    )
+
+                html += '</div>'
+
+            if takeaways:
+                html += (
+                    f'<div style="margin:20px 0 0;padding:14px;background:rgba(48,209,88,0.06);'
+                    f'border-radius:10px;border:1px solid rgba(48,209,88,0.15);">'
+                    f'<div style="color:#30d158;font-size:0.75rem;font-weight:700;margin-bottom:8px;text-transform:uppercase;">TAKEAWAYS</div>'
+                )
+                for i, t in enumerate(takeaways, 1):
+                    tc = t.get('content', '').replace('<mark>', f'<mark style="{mark_css}">').replace('<strong>', f'<strong style="{strong_css}">')
+                    html += f'<div style="margin:6px 0;color:#ddd;font-size:0.9rem;">{i}. {tc}</div>'
+                html += '</div>'
+
+            html += '</div>'
+            return mark_safe(html)
+
         elif model == 'chapter':
             html = f'<div style="{css}">'
             html += f'<div style="{meta_css}">{p.get("part", "")}</div>'
