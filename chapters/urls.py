@@ -21,10 +21,22 @@ urlpatterns = [
     path('manage/takeaways/', views.AdminTakeawayListCreateView.as_view(), name='admin-takeaway-list'),
     path('manage/takeaways/<int:pk>/', views.AdminTakeawayDetailView.as_view(), name='admin-takeaway-detail'),
 
+    # ── Staged requests (authenticated, admin approves) ──
+    path('staged/', views.StagedRequestListCreateView.as_view(), name='staged-list'),
+    path('staged/<int:pk>/', views.StagedRequestDetailView.as_view(), name='staged-detail'),
+    path('staged/<int:pk>/approve/', views.StagedRequestApproveView.as_view(), name='staged-approve'),
+    path('staged/<int:pk>/reject/', views.StagedRequestRejectView.as_view(), name='staged-reject'),
+
     # ── Authenticated (user-scoped) ──
     path('highlights/', views.HighlightListCreateView.as_view(), name='highlight-list'),
-    path('highlights/<int:pk>/', views.HighlightDestroyView.as_view(), name='highlight-delete'),
+    path('highlights/<int:pk>/', views.HighlightDetailView.as_view(), name='highlight-detail'),
     path('notes/', views.NoteListCreateView.as_view(), name='note-list'),
     path('notes/<int:pk>/', views.NoteDetailView.as_view(), name='note-detail'),
     path('notes/<int:pk>/analyze/', views.NoteAIAnalyzeView.as_view(), name='note-analyze'),
+
+    # ── DeltaMails subscriptions ──
+    path('deltamails/', views.SubscriptionListView.as_view(), name='deltamails-list'),
+    path('deltamails/subscribe/', views.SubscriptionCreateView.as_view(), name='deltamails-subscribe'),
+    path('deltamails/<int:pk>/preferences/', views.SubscriptionUpdatePreferencesView.as_view(), name='deltamails-preferences'),
+    path('deltamails/unsubscribe/', views.SubscriptionUnsubscribeView.as_view(), name='deltamails-unsubscribe'),
 ]

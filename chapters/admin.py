@@ -4,7 +4,7 @@ from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
 
-from .models import Subject, Chapter, Question, Takeaway, Highlight, Note
+from .models import Subject, Chapter, Question, Takeaway, Highlight, Note, StagedRequest, Subscription
 
 
 class ChapterInline(admin.TabularInline):
@@ -151,3 +151,86 @@ class NoteAdmin(admin.ModelAdmin):
     @admin.display(description='Content')
     def content_short(self, obj):
         return obj.content[:80]
+
+
+@admin.register(StagedRequest)
+class StagedRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'operation', 'target_model', 'target_id',
+        'status_badge', 'requested_by', 'created_at', 'reviewed_at',
+    )
+    list_filter = ('status', 'operation', 'target_model')
+    list_select_related = ('requested_by', 'reviewed_by')
+    readonly_fields = (
+        'operation', 'target_model', 'target_id', 'payload_pretty',
+        'requested_by', 'created_at', 'reviewed_by', 'reviewed_at', 'review_note',
+    )
+    actions = ['approve_selected', 'reject_selected']
+
+    @admin.display(description='Status')
+    def status_badge(self, obj):
+        colors = {'pending': '#ff9f0a', 'approved': '#30d158', 'rejected': '#ff453a'}
+        color = colors.get(obj.status, '#888')
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 10px;'
+            'border-radius:8px;font-size:0.8rem;font-weight:600">{}</span>',
+            color, obj.status.upper(),
+        )
+
+    @admin.display(description='Payload')
+    def payload_pretty(self, obj):
+        import json
+        return format_html(
+            '<pre style="max-height:400px;overflow:auto;background:#1c1c1e;'
+            'color:#f5f5f7;padding:12px;border-radius:8px;font-size:0.82rem">{}</pre>',
+            json.dumps(obj.payload, indent=2),
+        )
+
+    @admin.action(description='Approve selected requests')
+    def approve_selected(self, request, queryset):
+        count = 0
+        for sr in queryset.filter(status='pending'):
+            try:
+                sr.apply(reviewer=request.user)
+                count += 1
+            except Exception as e:
+                self.message_user(request, f'Failed to apply #{sr.pk}: {e}', level='error')
+        self.message_user(request, f'{count} request(s) approved and applied.')
+
+    @admin.action(description='Reject selected requests')
+    def reject_selected(self, request, queryset):
+        count = 0
+        for sr in queryset.filter(status='pending'):
+            sr.reject(reviewer=request.user, note='Bulk rejected via admin')
+            count += 1
+        self.message_user(request, f'{count} request(s) rejected.')
+
+
+@admin.register(Subscription)
+class SubscriptionAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'email', 'subject', 'difficulty', 'is_active',
+        'last_sent_at', 'created_at',
+    )
+    list_filter = ('is_active', 'difficulty', 'subject')
+    search_fields = ('email',)
+    readonly_fields = ('last_sent_at', 'last_chapter_sent', 'created_at')
+    actions = ['send_test_deltamail']
+
+    @admin.action(description='Send test DeltaMail to selected subscribers')
+    def send_test_deltamail(self, request, queryset):
+        from django.core.management import call_command
+        from io import StringIO
+
+        active = queryset.filter(is_active=True)
+        if not active.exists():
+            self.message_user(request, 'No active subscriptions selected.', level='warning')
+            return
+
+        emails = list(active.values_list('email', flat=True).distinct())
+        out = StringIO()
+        try:
+            call_command('send_deltamails', '--emails', *emails, stdout=out)
+            self.message_user(request, f'DeltaMail sent to: {", ".join(emails)}')
+        except Exception as e:
+            self.message_user(request, f'Failed: {e}', level='error')

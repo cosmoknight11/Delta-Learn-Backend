@@ -114,6 +114,84 @@ class Highlight(models.Model):
         return f'{self.user.username}: {self.text[:50]}'
 
 
+class StagedRequest(models.Model):
+    OPERATION_CHOICES = [
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+    ]
+    TARGET_MODEL_CHOICES = [
+        ('subject', 'Subject'),
+        ('chapter', 'Chapter'),
+        ('question', 'Question'),
+        ('takeaway', 'Takeaway'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    operation = models.CharField(max_length=10, choices=OPERATION_CHOICES)
+    target_model = models.CharField(max_length=20, choices=TARGET_MODEL_CHOICES)
+    target_id = models.PositiveIntegerField(null=True, blank=True)
+    payload = models.JSONField(default=dict)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='staged_requests',
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='reviewed_requests',
+    )
+    review_note = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        target = f'{self.target_model}#{self.target_id}' if self.target_id else self.target_model
+        return f'[{self.status}] {self.operation} {target} by {self.requested_by}'
+
+    def apply(self, reviewer):
+        """Execute the staged operation against the real models."""
+        from django.utils import timezone
+
+        model_map = {
+            'subject': Subject,
+            'chapter': Chapter,
+            'question': Question,
+            'takeaway': Takeaway,
+        }
+        model_cls = model_map[self.target_model]
+        payload = dict(self.payload)
+
+        if self.operation == 'create':
+            obj = model_cls.objects.create(**payload)
+            self.target_id = obj.pk
+        elif self.operation == 'update':
+            model_cls.objects.filter(pk=self.target_id).update(**payload)
+        elif self.operation == 'delete':
+            model_cls.objects.filter(pk=self.target_id).delete()
+
+        self.status = 'approved'
+        self.reviewed_by = reviewer
+        self.reviewed_at = timezone.now()
+        self.save()
+
+    def reject(self, reviewer, note=''):
+        from django.utils import timezone
+        self.status = 'rejected'
+        self.reviewed_by = reviewer
+        self.review_note = note
+        self.reviewed_at = timezone.now()
+        self.save()
+
+
 class Note(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notes'
@@ -137,3 +215,41 @@ class Note(models.Model):
     def __str__(self):
         scope = self.chapter or self.subject or 'General'
         return f'{self.user.username} — {scope}: {self.content[:50]}'
+
+
+class Subscription(models.Model):
+    DIFFICULTY_CHOICES = [
+        ('easy', 'Easy'),
+        ('medium', 'Medium'),
+        ('hard', 'Hard'),
+        ('mixed', 'Mixed'),
+    ]
+
+    email = models.EmailField()
+    subject = models.ForeignKey(
+        Subject, on_delete=models.CASCADE, related_name='subscriptions',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='subscriptions',
+    )
+    difficulty = models.CharField(
+        max_length=10, choices=DIFFICULTY_CHOICES, default='mixed',
+    )
+    custom_prompt = models.TextField(
+        blank=True, default='',
+        help_text='Optional: "explain like I am 5", "focus on trade-offs", etc.',
+    )
+    is_active = models.BooleanField(default=True)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    last_chapter_sent = models.ForeignKey(
+        Chapter, on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['email', 'subject']
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.email} → {self.subject.slug} ({self.difficulty})'

@@ -9,31 +9,55 @@ globs: "**/models.py,**/migrations/**"
 - Use snake_case for all model fields
 - ForeignKey fields: name by the related model (e.g., `subject`, `chapter`, `user`)
 - JSON fields: use `JSONField` with `default=list` or `default=dict`, never `null=True`
+- Timestamps: `auto_now_add=True` for creation, `auto_now=True` for updates
+
+## Model inventory
+
+| Model          | Parent     | Purpose                          | Key relationships                  |
+|----------------|-----------|----------------------------------|------------------------------------|
+| Subject        | —         | Top-level content category       | Has many chapters                  |
+| Chapter        | Subject   | One chapter within a subject     | Has many questions + takeaways     |
+| Question       | Chapter   | Interview question with answer   | Belongs to chapter                 |
+| Takeaway       | Chapter   | Quick-recall summary item        | Belongs to chapter                 |
+| Highlight      | User      | Text highlight in a chapter      | Belongs to user + chapter          |
+| Note           | User      | User note (subject/chapter)      | Belongs to user, optional subject/chapter |
+| StagedRequest  | User      | Proposed content change          | requested_by + reviewed_by users   |
+| Subscription   | Subject   | DeltaMails email subscription    | Belongs to subject, optional user  |
 
 ## Ordering
-- Always define `Meta.ordering` — typically by an explicit `order` field
-- Subjects: `order` (integer, for homepage card order)
-- Chapters: `order` (integer, within a subject)
-- Questions/Takeaways: `order` (integer, within a chapter)
+- Always define `Meta.ordering`
+- Subjects/Chapters/Questions/Takeaways: `order` field (PositiveIntegerField)
+- User data (highlights, notes, staged requests): `-created_at` (newest first)
 
 ## String representation
 - `__str__` must return something human-readable for Django Admin
-- Chapters: `f"{self.subject.name} — Ch.{self.chapter_number}: {self.title}"`
-- Questions: `f"Q{self.order}: {self.question[:60]}"`
+- Chapters: `f"{self.subject.slug} Ch.{self.chapter_number}: {self.title}"`
+- Questions: `f"Q{self.order}: {self.question[:80]}"`
+- StagedRequests: `f"[{self.status}] {self.operation} {self.target_model} by {self.requested_by}"`
+
+## StagedRequest model
+- `operation`: create / update / delete
+- `target_model`: subject / chapter / question / takeaway
+- `target_id`: null for create (set after apply), required for update/delete
+- `payload`: JSONField storing the model fields to create/update
+- `status`: pending → approved (via `apply()`) or rejected (via `reject()`)
+- `apply(reviewer)`: executes the operation, sets status to approved
+- `reject(reviewer, note)`: sets status to rejected with optional note
 
 ## User-scoped models
 - Always include `user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)`
-- Add `created_at = models.DateTimeField(auto_now_add=True)`
 - Highlights and Notes are user-scoped — never expose across users
+- StagedRequest: users see own requests, admins see all
 
 ## Migrations
 - Run `makemigrations` after every model change
-- Review migration files before committing — watch for unintended alterations
+- Review migration files before committing
 - Never manually edit migration files unless fixing a conflict
 
 ## Admin registration
 - Every model gets registered in `admin.py`
 - Use `list_display` with 3-5 useful columns
 - Use `list_filter` for ForeignKey fields and choice fields
-- Use `search_fields` for text fields the admin might search
 - Use inline admin classes for parent-child relationships (Chapter → Questions)
+- StagedRequest admin: color-coded status badges, JSON payload preview, bulk approve/reject actions
+- Subscription admin: list with email, subject, difficulty, is_active; "Send test DeltaMail" action

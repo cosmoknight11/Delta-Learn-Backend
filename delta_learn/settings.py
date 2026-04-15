@@ -10,10 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -169,6 +174,8 @@ SPECTACULAR_SETTINGS = {
         {'name': 'Highlights', 'description': 'User text highlights'},
         {'name': 'Notes', 'description': 'User notes with AI analysis'},
         {'name': 'Auth', 'description': 'Registration, login, token management'},
+        {'name': 'Staged Requests', 'description': 'Content change proposals (write via staged request, admin approves)'},
+        {'name': 'DeltaMails', 'description': 'Email subscription with personalized AI content'},
     ],
 }
 
@@ -180,3 +187,17 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False,
 }
+
+# ── Email (Gmail SMTP) ──
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'admin.deltalearn@gmail.com'
+EMAIL_HOST_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
+DEFAULT_FROM_EMAIL = 'DeltaMails <admin.deltalearn@gmail.com>'
+
+# ── Gemini / Gemma 4 ──
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')

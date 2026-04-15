@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 
-from .models import Subject, Chapter, Question, Takeaway, Highlight, Note
+from .models import Subject, Chapter, Question, Takeaway, Highlight, Note, StagedRequest, Subscription
 from .serializers import (
     SubjectListSerializer,
     SubjectDetailSerializer,
@@ -15,6 +15,12 @@ from .serializers import (
     TakeawayWriteSerializer,
     HighlightSerializer,
     NoteSerializer,
+    StagedRequestSerializer,
+    StagedRequestReviewSerializer,
+    SubscriptionSerializer,
+    SubscriptionCreateSerializer,
+    SubscriptionPreferencesSerializer,
+    SubscriptionUnsubscribeSerializer,
 )
 
 
@@ -234,10 +240,11 @@ class HighlightListCreateView(generics.ListCreateAPIView):
 
 
 @extend_schema(tags=['Highlights'])
-class HighlightDestroyView(generics.DestroyAPIView):
-    """Delete a highlight."""
+class HighlightDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Update (PATCH) or delete a highlight."""
     serializer_class = HighlightSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['patch', 'delete']
 
     def get_queryset(self):
         return Highlight.objects.filter(user=self.request.user)
@@ -306,3 +313,196 @@ class NoteAIAnalyzeView(APIView):
         )
         note.save(update_fields=['ai_summary'])
         return Response(NoteSerializer(note).data)
+
+
+# ────────────────────────────────────────────────────
+#  Staged request views
+# ────────────────────────────────────────────────────
+
+@extend_schema_view(
+    list=extend_schema(
+        tags=['Staged Requests'],
+        parameters=[
+            OpenApiParameter('status', str, description='Filter by status: pending, approved, rejected'),
+            OpenApiParameter('target_model', str, description='Filter by target model'),
+        ],
+    ),
+    create=extend_schema(tags=['Staged Requests']),
+)
+class StagedRequestListCreateView(generics.ListCreateAPIView):
+    """List staged requests (own for users, all for admin) or create a new one."""
+    serializer_class = StagedRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = StagedRequest.objects.select_related('requested_by', 'reviewed_by')
+        if not self.request.user.is_staff:
+            qs = qs.filter(requested_by=self.request.user)
+
+        req_status = self.request.query_params.get('status')
+        if req_status:
+            qs = qs.filter(status=req_status)
+
+        target = self.request.query_params.get('target_model')
+        if target:
+            qs = qs.filter(target_model=target)
+
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(requested_by=self.request.user)
+
+
+@extend_schema(tags=['Staged Requests'])
+class StagedRequestDetailView(generics.RetrieveAPIView):
+    """Retrieve a staged request's details."""
+    serializer_class = StagedRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = StagedRequest.objects.select_related('requested_by', 'reviewed_by')
+        if not self.request.user.is_staff:
+            qs = qs.filter(requested_by=self.request.user)
+        return qs
+
+
+@extend_schema(tags=['Staged Requests'], request=StagedRequestReviewSerializer)
+class StagedRequestApproveView(APIView):
+    """Approve a staged request and apply the change. Admin only."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, pk):
+        staged = get_object_or_404(StagedRequest, pk=pk)
+        if staged.status != 'pending':
+            return Response(
+                {'detail': f'Request is already {staged.status}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            staged.apply(reviewer=request.user)
+        except Exception as e:
+            return Response(
+                {'detail': f'Failed to apply: {e}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(StagedRequestSerializer(staged).data)
+
+
+@extend_schema(tags=['Staged Requests'], request=StagedRequestReviewSerializer)
+class StagedRequestRejectView(APIView):
+    """Reject a staged request with an optional note. Admin only."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, pk):
+        staged = get_object_or_404(StagedRequest, pk=pk)
+        if staged.status != 'pending':
+            return Response(
+                {'detail': f'Request is already {staged.status}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        ser = StagedRequestReviewSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        staged.reject(reviewer=request.user, note=ser.validated_data.get('note', ''))
+        return Response(StagedRequestSerializer(staged).data)
+
+
+# ────────────────────────────────────────────────────
+#  DeltaMails subscription views
+# ────────────────────────────────────────────────────
+
+@extend_schema(tags=['DeltaMails'])
+class SubscriptionListView(APIView):
+    """List subscriptions for the authenticated user, or by email query param."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        if request.user.is_authenticated:
+            qs = Subscription.objects.filter(user=request.user, is_active=True)
+        else:
+            email = request.query_params.get('email')
+            if not email:
+                return Response(
+                    {'detail': 'Provide ?email= or authenticate.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = Subscription.objects.filter(email=email, is_active=True)
+        return Response(SubscriptionSerializer(qs, many=True).data)
+
+
+@extend_schema(tags=['DeltaMails'], request=SubscriptionCreateSerializer)
+class SubscriptionCreateView(APIView):
+    """Subscribe to DeltaMails for one or more subjects."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        ser = SubscriptionCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        subjects = Subject.objects.filter(slug__in=data['subjects'])
+        if not subjects.exists():
+            return Response(
+                {'detail': 'No valid subjects found.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = []
+        for sub in subjects:
+            obj, was_created = Subscription.objects.update_or_create(
+                email=data['email'],
+                subject=sub,
+                defaults={
+                    'difficulty': data['difficulty'],
+                    'custom_prompt': data.get('custom_prompt', ''),
+                    'is_active': True,
+                    'user': request.user if request.user.is_authenticated else None,
+                },
+            )
+            created.append(obj)
+
+        return Response(
+            SubscriptionSerializer(created, many=True).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+@extend_schema(tags=['DeltaMails'], request=SubscriptionPreferencesSerializer)
+class SubscriptionUpdatePreferencesView(APIView):
+    """Update difficulty / custom_prompt for a subscription."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        sub = get_object_or_404(Subscription, pk=pk, user=request.user)
+        ser = SubscriptionPreferencesSerializer(data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+
+        if 'difficulty' in ser.validated_data:
+            sub.difficulty = ser.validated_data['difficulty']
+        if 'custom_prompt' in ser.validated_data:
+            sub.custom_prompt = ser.validated_data['custom_prompt']
+        sub.save()
+
+        return Response(SubscriptionSerializer(sub).data)
+
+
+@extend_schema(tags=['DeltaMails'], request=SubscriptionUnsubscribeSerializer)
+class SubscriptionUnsubscribeView(APIView):
+    """Deactivate a subscription by email + subject slug."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        ser = SubscriptionUnsubscribeSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        updated = Subscription.objects.filter(
+            email=ser.validated_data['email'],
+            subject__slug=ser.validated_data['subject'],
+            is_active=True,
+        ).update(is_active=False)
+
+        if not updated:
+            return Response(
+                {'detail': 'No active subscription found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response({'detail': 'Unsubscribed successfully.'})

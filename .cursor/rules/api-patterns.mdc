@@ -7,27 +7,56 @@ globs: "**/views.py,**/serializers.py,**/urls.py"
 
 ## View conventions
 
-- Public views: inherit from `generics.ListAPIView` / `RetrieveAPIView`, set `permission_classes = [AllowAny]`
-- Authenticated views: inherit from `generics.ListCreateAPIView` / `RetrieveUpdateDestroyAPIView`, set `permission_classes = [IsAuthenticated]`
+- Public views: `generics.ListAPIView` / `RetrieveAPIView`, `permission_classes = [AllowAny]`
+- Authenticated views: `generics.ListCreateAPIView` / `RetrieveUpdateDestroyAPIView`, `permission_classes = [IsAuthenticated]`
+- Admin CRUD views: same generics pattern but `permission_classes = [IsAdminUser]`
 - Always scope user-owned data: `get_queryset` must filter by `user=self.request.user`
-- Use `get_object_or_404` with compound lookups (slug + number) instead of pk for content endpoints
+- Use `get_object_or_404` with compound lookups (slug + number) for content endpoints
+- Always add `@extend_schema(tags=['Tag Name'])` for Swagger documentation
 
-## Serializer conventions
+## Serializer categories
 
-- Use `source=` to map snake_case model fields to camelCase JSON keys
-- Include `_dbId` (mapped from `pk`) when the frontend needs to reference a record
-- Keep serializers flat — avoid deep nesting beyond one level
-- Use `SerializerMethodField` for computed values like `chapter_count`
+| Category         | Naming                    | Use case                       |
+|------------------|---------------------------|--------------------------------|
+| Read (public)    | `QuestionReadSerializer`  | Frontend consumption, camelCase |
+| Write (admin)    | `QuestionWriteSerializer` | Admin CRUD, snake_case          |
+| Staged           | `StagedRequestSerializer` | Staged request payloads         |
+| User-scoped      | `HighlightSerializer`     | Per-user data                   |
 
 ## URL conventions
 
-- Public content: `/api/subjects/`, `/api/subjects/<slug>/`, `/api/subjects/<slug>/chapters/<int:number>/`
-- Authenticated resources: `/api/highlights/`, `/api/notes/`
-- Auth endpoints: `/api/auth/register/`, `/api/auth/login/`, `/api/auth/token/refresh/`, `/api/auth/me/`
+| Prefix             | Auth        | Purpose                              |
+|--------------------|-------------|--------------------------------------|
+| `/api/subjects/`   | None        | Public content (read-only)           |
+| `/api/auth/`       | None/Bearer | Registration, login, token refresh   |
+| `/api/manage/`     | Admin       | Direct CRUD on content models        |
+| `/api/staged/`     | Bearer      | Staged request workflow              |
+| `/api/highlights/` | Bearer      | User highlights                      |
+| `/api/notes/`      | Bearer      | User notes                           |
+| `/api/schema/`     | None        | OpenAPI schema                       |
+| `/api/docs/`       | None        | Swagger UI                           |
+| `/api/redoc/`      | None        | ReDoc                                |
+
+## Staged request payload shape
+
+```json
+{
+  "operation": "create | update | delete",
+  "target_model": "subject | chapter | question | takeaway",
+  "target_id": null,
+  "payload": { "field": "value" }
+}
+```
+
+- `target_id` is null for create, required for update/delete
+- `payload` contains model fields as key-value pairs
+- For create: payload has all required fields (e.g., `chapter_id`, `question`, `answer`)
+- For update: payload has only the fields to change
+- For delete: payload is empty `{}`
 
 ## Filtering
 
-- Use query params for list filtering: `?subject=slug&chapter=number`
+- Use query params for list filtering: `?subject=slug&chapter=number&status=pending`
 - Parse in `get_queryset`, not in the serializer
 - Return empty list (not 404) when no matches
 
@@ -35,4 +64,14 @@ globs: "**/views.py,**/serializers.py,**/urls.py"
 
 - Use DRF's built-in error formatting (400 with field-level errors)
 - Custom errors: return `Response({"detail": "message"}, status=XXX)`
+- Staged request errors: "Request is already approved/rejected" on double action
 - Never expose internal details (tracebacks, SQL) in error responses
+
+## DeltaMails endpoints
+
+| Method | Endpoint                           | Auth     | Description                            |
+|--------|------------------------------------|----------|----------------------------------------|
+| GET    | /api/deltamails/                   | Optional | List subscriptions (by user or ?email) |
+| POST   | /api/deltamails/subscribe/         | Optional | Create subscriptions (multi-subject)   |
+| PATCH  | /api/deltamails/{id}/preferences/  | JWT      | Update difficulty / custom_prompt      |
+| POST   | /api/deltamails/unsubscribe/       | No       | Deactivate by email + subject slug     |

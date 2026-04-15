@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Subject, Chapter, Question, Takeaway, Highlight, Note
+from .models import Subject, Chapter, Question, Takeaway, Highlight, Note, StagedRequest, Subscription
 
 
 # ────────────────────────────────────────────────────
@@ -132,11 +132,14 @@ class HighlightSerializer(serializers.ModelSerializer):
     chapter_slug = serializers.SerializerMethodField()
     chapter_title = serializers.SerializerMethodField()
     chapter_number = serializers.IntegerField(source='chapter.chapter_number', read_only=True)
+    subject_name = serializers.CharField(source='chapter.subject.name', read_only=True)
+    chapter_part = serializers.CharField(source='chapter.part', read_only=True)
 
     class Meta:
         model = Highlight
         fields = [
             'id', 'chapter', 'chapter_number', 'chapter_slug', 'chapter_title',
+            'subject_name', 'chapter_part',
             'question_index', 'text', 'color', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
@@ -172,3 +175,74 @@ class NoteSerializer(serializers.ModelSerializer):
             ).first()
             validated_data['chapter'] = chapter
         return super().create(validated_data)
+
+
+# ────────────────────────────────────────────────────
+#  Staged request serializers
+# ────────────────────────────────────────────────────
+
+class StagedRequestSerializer(serializers.ModelSerializer):
+    requested_by_username = serializers.CharField(
+        source='requested_by.username', read_only=True,
+    )
+    reviewed_by_username = serializers.CharField(
+        source='reviewed_by.username', read_only=True, default=None,
+    )
+
+    class Meta:
+        model = StagedRequest
+        fields = [
+            'id', 'operation', 'target_model', 'target_id', 'payload',
+            'status', 'requested_by_username', 'reviewed_by_username',
+            'review_note', 'created_at', 'reviewed_at',
+        ]
+        read_only_fields = [
+            'id', 'status', 'requested_by_username',
+            'reviewed_by_username', 'review_note',
+            'created_at', 'reviewed_at',
+        ]
+
+
+class StagedRequestReviewSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, default='', allow_blank=True)
+
+
+# ────────────────────────────────────────────────────
+#  DeltaMails subscription serializers
+# ────────────────────────────────────────────────────
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    subject_slug = serializers.CharField(source='subject.slug', read_only=True)
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+
+    class Meta:
+        model = Subscription
+        fields = [
+            'id', 'email', 'subject_slug', 'subject_name',
+            'difficulty', 'custom_prompt', 'is_active', 'created_at',
+        ]
+        read_only_fields = ['id', 'email', 'subject_slug', 'subject_name', 'created_at']
+
+
+class SubscriptionCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    subjects = serializers.ListField(
+        child=serializers.SlugField(), min_length=1,
+    )
+    difficulty = serializers.ChoiceField(
+        choices=['easy', 'medium', 'hard', 'mixed'], default='mixed',
+    )
+    custom_prompt = serializers.CharField(required=False, default='', allow_blank=True)
+
+
+class SubscriptionPreferencesSerializer(serializers.Serializer):
+    subject = serializers.SlugField()
+    difficulty = serializers.ChoiceField(
+        choices=['easy', 'medium', 'hard', 'mixed'], required=False,
+    )
+    custom_prompt = serializers.CharField(required=False, allow_blank=True)
+
+
+class SubscriptionUnsubscribeSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    subject = serializers.SlugField()
