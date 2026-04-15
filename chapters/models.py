@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -85,3 +86,54 @@ class Takeaway(models.Model):
 
     def __str__(self):
         return f'Takeaway {self.order}: {self.content[:60]}'
+
+
+class Highlight(models.Model):
+    COLOR_CHOICES = [
+        ('yellow', 'Yellow'),
+        ('green', 'Green'),
+        ('blue', 'Blue'),
+        ('pink', 'Pink'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='highlights'
+    )
+    chapter = models.ForeignKey(
+        Chapter, on_delete=models.CASCADE, related_name='highlights'
+    )
+    question_index = models.PositiveIntegerField()
+    text = models.TextField()
+    color = models.CharField(max_length=10, choices=COLOR_CHOICES, default='yellow')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.username}: {self.text[:50]}'
+
+
+class Note(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notes'
+    )
+    subject = models.ForeignKey(
+        Subject, on_delete=models.CASCADE, related_name='notes',
+        null=True, blank=True,
+    )
+    chapter = models.ForeignKey(
+        Chapter, on_delete=models.CASCADE, related_name='notes',
+        null=True, blank=True,
+    )
+    content = models.TextField()
+    ai_summary = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        scope = self.chapter or self.subject or 'General'
+        return f'{self.user.username} — {scope}: {self.content[:50]}'

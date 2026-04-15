@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Subject, Chapter, Question, Takeaway
+from .models import Subject, Chapter, Question, Takeaway, Highlight, Note
 
 
 class ChapterInline(admin.TabularInline):
@@ -85,3 +85,25 @@ class TakeawayAdmin(admin.ModelAdmin):
     @admin.display(description='Content')
     def content_short(self, obj):
         return obj.content[:100]
+
+
+@admin.register(Highlight)
+class HighlightAdmin(admin.ModelAdmin):
+    list_display = ('user', 'chapter', 'question_index', 'color', 'text_short', 'created_at')
+    list_filter = ('color', 'chapter__subject')
+    list_select_related = ('user', 'chapter', 'chapter__subject')
+
+    @admin.display(description='Text')
+    def text_short(self, obj):
+        return obj.text[:80]
+
+
+@admin.register(Note)
+class NoteAdmin(admin.ModelAdmin):
+    list_display = ('user', 'subject', 'chapter', 'content_short', 'updated_at')
+    list_filter = ('subject',)
+    list_select_related = ('user', 'subject', 'chapter')
+
+    @admin.display(description='Content')
+    def content_short(self, obj):
+        return obj.content[:80]
