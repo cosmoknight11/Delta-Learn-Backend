@@ -1,4 +1,9 @@
 from django.contrib import admin
+from django.shortcuts import get_object_or_404
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
+from django.utils.html import format_html
+
 from .models import Subject, Chapter, Question, Takeaway, Highlight, Note
 
 
@@ -53,15 +58,54 @@ class TakeawayInline(admin.TabularInline):
 
 @admin.register(Chapter)
 class ChapterAdmin(admin.ModelAdmin):
-    list_display = ('chapter_number', 'title', 'subject', 'part', 'question_count')
+    list_display = ('chapter_number', 'title', 'subject', 'part', 'question_count', 'preview_link')
     list_filter = ('subject', 'part')
     search_fields = ('title', 'subtitle')
     list_select_related = ('subject',)
     inlines = [QuestionInline, TakeawayInline]
+    change_form_template = 'admin/chapters/chapter_change_form.html'
 
     @admin.display(description='Questions')
     def question_count(self, obj):
         return obj.questions.count()
+
+    @admin.display(description='Preview')
+    def preview_link(self, obj):
+        url = reverse('admin:chapters_chapter_preview', args=[obj.pk])
+        return format_html(
+            '<a href="{}" target="_blank" style="white-space:nowrap">'
+            '&#9654; Preview</a>',
+            url,
+        )
+
+    def get_urls(self):
+        custom = [
+            path(
+                '<int:pk>/preview/',
+                self.admin_site.admin_view(self.preview_view),
+                name='chapters_chapter_preview',
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def preview_view(self, request, pk):
+        chapter = get_object_or_404(
+            Chapter.objects.select_related('subject'),
+            pk=pk,
+        )
+        questions = chapter.questions.all()
+        takeaways = chapter.takeaways.all()
+        context = {
+            **self.admin_site.each_context(request),
+            'chapter': chapter,
+            'questions': questions,
+            'takeaways': takeaways,
+        }
+        return TemplateResponse(
+            request,
+            'admin/chapters/chapter_preview.html',
+            context,
+        )
 
 
 @admin.register(Question)

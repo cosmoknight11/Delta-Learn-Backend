@@ -1,0 +1,46 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block submit_buttons_top %}
+  {{ block.super }}
+  {% if original %}
+    <div style="margin: 8px 0 0; display: flex; gap: 8px;">
+      <a href="{% url 'admin:chapters_chapter_preview' original.pk %}"
+         target="_blank"
+         style="display:inline-block; padding:8px 18px; border-radius:6px;
+                background:#0a84ff; color:#fff; font-weight:600; font-size:0.82rem;
+                text-decoration:none; letter-spacing:0.01em;">
+        &#9654; Preview Chapter
+      </a>
+      <a href="http://localhost:5173/{{ original.subject.slug }}/chapter/{{ original.chapter_number }}"
+         target="_blank"
+         style="display:inline-block; padding:8px 18px; border-radius:6px;
+                background:transparent; color:#0a84ff; font-weight:600; font-size:0.82rem;
+                text-decoration:none; border:1px solid #0a84ff;">
+        Open on Site &nearr;
+      </a>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+  {{ block.super }}
+  {% if original %}
+    <div style="margin: 8px 0 0; display: flex; gap: 8px;">
+      <a href="{% url 'admin:chapters_chapter_preview' original.pk %}"
+         target="_blank"
+         style="display:inline-block; padding:8px 18px; border-radius:6px;
+                background:#0a84ff; color:#fff; font-weight:600; font-size:0.82rem;
+                text-decoration:none; letter-spacing:0.01em;">
+        &#9654; Preview Chapter
+      </a>
+      <a href="http://localhost:5173/{{ original.subject.slug }}/chapter/{{ original.chapter_number }}"
+         target="_blank"
+         style="display:inline-block; padding:8px 18px; border-radius:6px;
+                background:transparent; color:#0a84ff; font-weight:600; font-size:0.82rem;
+                text-decoration:none; border:1px solid #0a84ff;">
+        Open on Site &nearr;
+      </a>
+    </div>
+  {% endif %}
+{% endblock %}

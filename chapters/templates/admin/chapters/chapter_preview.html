@@ -1,0 +1,511 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview — {{ chapter.title }}</title>
+  <style>
+    :root {
+      --bg-primary: #000000;
+      --bg-secondary: #0d0d0d;
+      --bg-elevated: #141414;
+      --bg-hover: #1c1c1e;
+      --bg-active: #2c2c2e;
+      --text-primary: #f5f5f7;
+      --text-secondary: #86868b;
+      --text-tertiary: #58585d;
+      --accent: {{ chapter.subject.accent_color }};
+      --accent-subtle: {{ chapter.subject.accent_color }}1a;
+      --accent-green: #30d158;
+      --accent-orange: #ff9f0a;
+      --accent-red: #ff453a;
+      --accent-purple: #bf5af2;
+      --accent-teal: #64d2ff;
+      --border: rgba(255, 255, 255, 0.06);
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+        'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, 'Cascadia Code',
+        Menlo, Monaco, Consolas, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── Admin toolbar ── */
+    .preview-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-strong);
+      backdrop-filter: blur(20px);
+    }
+    .preview-toolbar-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .preview-toolbar-actions { display: flex; gap: 10px; }
+    .preview-toolbar a {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-back {
+      background: var(--bg-active);
+      color: var(--text-primary);
+    }
+    .btn-back:hover { background: var(--bg-hover); }
+    .btn-edit {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-edit:hover { opacity: 0.85; }
+    .btn-frontend {
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      color: var(--accent);
+    }
+    .btn-frontend:hover { background: var(--bg-hover); }
+
+    /* ── Chapter container ── */
+    .chapter-container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 48px 24px 100px;
+    }
+
+    /* ── Chapter header ── */
+    .chapter-header {
+      margin-bottom: 56px;
+      padding-bottom: 40px;
+      border-bottom: 1px solid var(--border);
+    }
+    .chapter-part-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 980px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .chapter-title {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin: 0 0 10px;
+    }
+    .chapter-subtitle {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      margin: 0 0 16px;
+    }
+    .chapter-count {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--text-tertiary);
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Q&A sections ── */
+    .qa {
+      padding: 40px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .qa:last-of-type { border-bottom: none; }
+    .qa-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .qa-num {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      letter-spacing: 0.02em;
+    }
+    .qa-diff {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 980px;
+    }
+    .qa-diff-easy { background: rgba(48, 209, 88, 0.12); color: var(--accent-green); }
+    .qa-diff-medium { background: rgba(255, 159, 10, 0.12); color: var(--accent-orange); }
+    .qa-diff-hard { background: rgba(255, 69, 58, 0.12); color: var(--accent-red); }
+
+    .qa-question {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      color: var(--text-primary);
+      margin: 0 0 20px;
+    }
+    .qa-tldr {
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1.5;
+      margin-bottom: 20px;
+      padding: 12px 16px;
+      background: var(--accent-subtle);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent);
+    }
+    .qa-answer {
+      font-size: 0.9rem;
+      line-height: 1.75;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+    }
+    .qa-answer p { margin: 0 0 14px; }
+    .qa-answer p:last-child { margin-bottom: 0; }
+
+    .qa-points { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+    .qa-point {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+    .qa-point-marker {
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 8px;
+    }
+    .qa-point strong { color: var(--text-primary); }
+
+    /* ── Tables ── */
+    .qa-table-wrap {
+      overflow-x: auto;
+      margin: 20px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .qa-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .qa-table th {
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-strong);
+    }
+    .qa-table td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+    .qa-table tr:last-child td { border-bottom: none; }
+    .qa-table tr:hover td { background: var(--bg-elevated); }
+
+    /* ── Follow-up ── */
+    .qa-followup {
+      margin-top: 24px;
+      padding: 16px 18px;
+      border-radius: var(--radius-sm);
+      background: rgba(191, 90, 242, 0.06);
+      border: 1px solid rgba(191, 90, 242, 0.12);
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: var(--text-primary);
+    }
+    .qa-followup-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent-purple);
+      margin-bottom: 8px;
+    }
+    .qa-followup p { margin: 0 0 10px; }
+    .qa-followup p:last-child { margin-bottom: 0; }
+
+    /* ── Mermaid diagrams ── */
+    .diagram-container {
+      margin: 24px 0;
+      overflow-x: auto;
+    }
+    .diagram-render {
+      display: flex;
+      justify-content: center;
+      padding: 20px 12px;
+      background: var(--bg-elevated);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    .diagram-caption {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      text-align: center;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* ── Takeaways ── */
+    .takeaways {
+      margin-top: 48px;
+      padding: 28px;
+      border-radius: var(--radius-md);
+      background: rgba(48, 209, 88, 0.04);
+      border: 1px solid rgba(48, 209, 88, 0.10);
+    }
+    .takeaways-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent-green);
+      margin-bottom: 18px;
+    }
+    .takeaways-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .takeaway-item {
+      font-size: 0.85rem;
+      line-height: 1.55;
+      color: var(--text-primary);
+      padding: 10px 14px;
+      background: var(--bg-elevated);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent-green);
+    }
+    .takeaway-item strong { color: var(--text-primary); }
+
+    /* ── mark highlight ── */
+    mark {
+      background: rgba(255, 214, 0, 0.22);
+      color: inherit;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    /* ── Empty state ── */
+    .empty-notice {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-tertiary);
+      font-size: 1rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .chapter-container { padding: 32px 16px 80px; }
+      .chapter-title { font-size: 1.5rem; }
+      .qa-question { font-size: 1.1rem; }
+      .preview-toolbar { padding: 8px 16px; }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        themeVariables: {
+          darkMode: true,
+          primaryColor: '{{ chapter.subject.accent_color }}',
+          background: '#141414',
+          mainBkg: '#141414',
+          lineColor: '#58585d',
+          textColor: '#f5f5f7',
+        }
+      });
+      document.querySelectorAll('.mermaid-src').forEach(async function (el) {
+        const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
+        try {
+          const { svg } = await mermaid.render(id, el.textContent.trim());
+          el.closest('.diagram-render').innerHTML = svg;
+        } catch (e) {
+          el.closest('.diagram-render').innerHTML =
+            '<pre style="color:var(--accent-red);font-size:0.8rem">Diagram error: ' +
+            e.message + '</pre>';
+        }
+      });
+    });
+  </script>
+</head>
+<body>
+
+  <div class="preview-toolbar">
+    <span class="preview-toolbar-title">
+      Admin Preview — {{ chapter.subject.name }}
+    </span>
+    <div class="preview-toolbar-actions">
+      <a href="{% url 'admin:chapters_chapter_change' chapter.pk %}" class="btn-edit">
+        Edit in Admin
+      </a>
+      <a href="http://localhost:5173/{{ chapter.subject.slug }}/chapter/{{ chapter.chapter_number }}"
+         target="_blank" class="btn-frontend">
+        Open on Site &nearr;
+      </a>
+      <a href="{% url 'admin:chapters_chapter_changelist' %}" class="btn-back">
+        Back to List
+      </a>
+    </div>
+  </div>
+
+  <div class="chapter-container">
+    <header class="chapter-header">
+      {% if chapter.part %}
+        <span class="chapter-part-badge">{{ chapter.part }}</span>
+      {% endif %}
+      <h1 class="chapter-title">{{ chapter.title }}</h1>
+      {% if chapter.subtitle %}
+        <p class="chapter-subtitle">{{ chapter.subtitle }}</p>
+      {% endif %}
+      {% if questions %}
+        <div class="chapter-count">{{ questions|length }} question{{ questions|length|pluralize }} covering the full topic</div>
+      {% endif %}
+    </header>
+
+    {% if not questions and not takeaways %}
+      <div class="empty-notice">
+        This chapter has no content yet.<br>
+        <a href="{% url 'admin:chapters_chapter_change' chapter.pk %}" style="color:var(--accent)">Add questions in the admin &rarr;</a>
+      </div>
+    {% endif %}
+
+    {% for q in questions %}
+      <section class="qa">
+        <div class="qa-header">
+          <span class="qa-num">{{ forloop.counter|stringformat:"02d" }}/{{ questions|length|stringformat:"02d" }}</span>
+          {% if q.difficulty %}
+            <span class="qa-diff qa-diff-{{ q.difficulty }}">{{ q.difficulty }}</span>
+          {% endif %}
+        </div>
+
+        <h2 class="qa-question">{{ q.question }}</h2>
+
+        {% if q.tldr %}
+          <div class="qa-tldr">{{ q.tldr }}</div>
+        {% endif %}
+
+        {% if q.answer %}
+          <div class="qa-answer">{{ q.answer|safe }}</div>
+        {% endif %}
+
+        {% if q.diagram %}
+          <div class="diagram-container">
+            <div class="diagram-render">
+              <pre class="mermaid-src" style="display:none">{{ q.diagram }}</pre>
+              <div style="color:var(--text-tertiary);font-size:0.8rem;">Loading diagram…</div>
+            </div>
+            {% if q.diagram_caption %}
+              <div class="diagram-caption">{{ q.diagram_caption }}</div>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {% if q.points %}
+          <div class="qa-points">
+            {% for point in q.points %}
+              <div class="qa-point">
+                <span class="qa-point-marker"></span>
+                <div>{{ point|safe }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if q.table_data %}
+          <div class="qa-table-wrap">
+            <table class="qa-table">
+              <thead>
+                <tr>
+                  {% for header in q.table_data.headers %}
+                    <th>{{ header }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in q.table_data.rows %}
+                  <tr>
+                    {% for cell in row %}
+                      <td>{{ cell|safe }}</td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+
+        {% if q.diagram2 %}
+          <div class="diagram-container">
+            <div class="diagram-render">
+              <pre class="mermaid-src" style="display:none">{{ q.diagram2 }}</pre>
+              <div style="color:var(--text-tertiary);font-size:0.8rem;">Loading diagram…</div>
+            </div>
+            {% if q.diagram2_caption %}
+              <div class="diagram-caption">{{ q.diagram2_caption }}</div>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {% if q.followup %}
+          <div class="qa-followup">
+            <div class="qa-followup-label">Follow-up the interviewer will ask</div>
+            <div>{{ q.followup|safe }}</div>
+          </div>
+        {% endif %}
+      </section>
+    {% endfor %}
+
+    {% if takeaways %}
+      <div class="takeaways">
+        <div class="takeaways-title">Rapid Recall</div>
+        <div class="takeaways-grid">
+          {% for t in takeaways %}
+            <div class="takeaway-item">{{ t.content|safe }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+</body>
+</html>
