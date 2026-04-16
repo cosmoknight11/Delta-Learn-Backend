@@ -1,7 +1,6 @@
 import hmac
-import io
 import logging
-from contextlib import redirect_stdout, redirect_stderr
+import threading
 
 from django.conf import settings
 from django.core.management import call_command
@@ -17,8 +16,24 @@ ALLOWED_TASKS = {
 }
 
 
+def _run_command(command):
+    """Execute a management command in a background thread."""
+    started = timezone.now()
+    try:
+        call_command(command)
+        elapsed = (timezone.now() - started).total_seconds()
+        logger.info('Cron task %s completed in %.1fs', command, elapsed)
+    except Exception:
+        elapsed = (timezone.now() - started).total_seconds()
+        logger.exception('Cron task %s failed after %.1fs', command, elapsed)
+
+
 class CronTriggerView(View):
     """Secret-protected webhook that external cron services can call.
+
+    Validates the token, kicks off the management command in a background
+    thread, and returns 202 Accepted immediately so the HTTP caller
+    (cron-job.org) never times out.
 
     Usage:
         GET /cron/send-deltamails/?token=<CRON_SECRET>
@@ -43,27 +58,12 @@ class CronTriggerView(View):
                 status=404,
             )
 
-        started = timezone.now()
-        stdout_buf = io.StringIO()
-        stderr_buf = io.StringIO()
+        thread = threading.Thread(target=_run_command, args=(command,), daemon=True)
+        thread.start()
+        logger.info('Cron task %s dispatched in background thread', command)
 
-        try:
-            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-                call_command(command)
-            elapsed = (timezone.now() - started).total_seconds()
-            logger.info('Cron task %s completed in %.1fs', command, elapsed)
-            return JsonResponse({
-                'status': 'ok',
-                'task': command,
-                'elapsed_seconds': round(elapsed, 1),
-                'output': stdout_buf.getvalue()[-500:],
-            })
-        except Exception as exc:
-            elapsed = (timezone.now() - started).total_seconds()
-            logger.exception('Cron task %s failed after %.1fs', command, elapsed)
-            return JsonResponse({
-                'status': 'error',
-                'task': command,
-                'elapsed_seconds': round(elapsed, 1),
-                'detail': str(exc)[:200],
-            }, status=500)
+        return JsonResponse({
+            'status': 'accepted',
+            'task': command,
+            'detail': 'Running in background',
+        }, status=202)
