@@ -185,6 +185,10 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': False,
 }
 
+# ── Cron webhook secret (for external cron services on free hosting) ──
+
+CRON_SECRET = os.environ.get('CRON_SECRET', '')
+
 # ── Scheduled jobs (django-crontab) ──
 
 CRONJOBS = [
