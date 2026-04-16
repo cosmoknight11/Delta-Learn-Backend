@@ -4,5 +4,6 @@ djangorestframework-simplejwt==5.5.1
 django-cors-headers==4.9.0
 drf-spectacular==0.29.0
 django-crontab>=0.7.1
+APScheduler>=3.10.0
 google-genai>=1.0.0
 python-dotenv>=1.0.0
